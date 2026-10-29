@@ -2,13 +2,14 @@
 
 const { runIngestion } = require('./core')
 const { createCloudBaseStore } = require('./cloudbase-store')
-const TRIGGER_NAME = 'intelCrawlerSixHours'
+const TRIGGER_NAME = 'intelCrawlerEvery6Hours'
 const TIMER_STATUS_ID = '__timer_status__'
 const TIMER_REJECTIONS_ID = '__timer_rejections__'
 const REJECTION_AUDIT_INTERVAL_MS = 60 * 1000
 
 function validTimerEnvelope (event, context, env = process.env) {
-  if (env.TRIGGER_SRC !== 'timer') return false
+  if (env.TRIGGER_SRC !== 'timer' && env.INFOFLOW_PLATFORM_ONLY !== 'true') return false
+  if (env.INFOFLOW_PLATFORM_ONLY === 'true' && context && context.SOURCE && !['scf','wx_trigger'].includes(context.SOURCE)) return false
   if (!context || context.OPENID || context.UID || context.SOURCE === 'tcbgw' || context.TCB_SOURCE === 'tcbgw') return false
   return Boolean(event && typeof event.Type === 'string' && event.Type.toLowerCase() === 'timer' && event.TriggerName === TRIGGER_NAME &&
     typeof event.Time === 'string' && Number.isFinite(Date.parse(event.Time)))
@@ -29,6 +30,7 @@ function numericErrorCode (error) {
 
 function createMain ({ cloud, getRuntimeEnv, ingestion = runIngestion, storeFactory = createCloudBaseStore, processEnv = process.env } = {}) {
   return async function main (event, runtimeContext) {
+    if (event && event.TriggerName === 'intelCrawlerSixHours') return { ok: false, code: 'RETIRED_TRIGGER' }
     const sdk = cloud || require('wx-server-sdk')
     sdk.init({ env: sdk.DYNAMIC_CURRENT_ENV })
     const runtimeEnv = getRuntimeEnv
@@ -37,7 +39,8 @@ function createMain ({ cloud, getRuntimeEnv, ingestion = runIngestion, storeFact
     const wxContext = sdk.getWXContext() || {}
     const hasIdentity = !!(wxContext.OPENID || wxContext.UID || runtimeEnv.WX_OPENID || runtimeEnv.UID)
     const fromGateway = wxContext.SOURCE === 'tcbgw' || wxContext.TCB_SOURCE === 'tcbgw' || runtimeEnv.SOURCE === 'tcbgw' || runtimeEnv.TCB_SOURCE === 'tcbgw'
-    const trustedTimer = runtimeEnv.TRIGGER_SRC === 'timer' && !hasIdentity && !fromGateway
+    const authEnv = Object.assign({}, runtimeEnv, { INFOFLOW_PLATFORM_ONLY: processEnv.INFOFLOW_PLATFORM_ONLY })
+    const trustedTimer = (runtimeEnv.TRIGGER_SRC === 'timer' || (authEnv.INFOFLOW_PLATFORM_ONLY === 'true' && (!wxContext.SOURCE || ['scf','wx_trigger'].includes(wxContext.SOURCE)))) && !hasIdentity && !fromGateway
     const checks = eventChecks(event)
     const writeRejectedAudit = async () => {
       if (trustedTimer) return
@@ -55,7 +58,7 @@ function createMain ({ cloud, getRuntimeEnv, ingestion = runIngestion, storeFact
           const at = Date.now()
           if (previous && Number(previous.at) > at - REJECTION_AUDIT_INTERVAL_MS) return
           await doc.set({ data: {
-            trustedTimer: false,
+            trustedTimer: false, sourceClass: ['wx_client','wx_devtools','wx_unknown','wx_http','scf','timer','wx_trigger','http',''].includes(wxContext.SOURCE || '') ? (wxContext.SOURCE || 'empty') : 'other', runtimeTimer: runtimeEnv.TRIGGER_SRC === 'timer', hasIdentity, fromGateway,
             phase: 'rejected',
             eventTimer: checks.eventTimer,
             expectedName: checks.expectedName,
@@ -75,6 +78,7 @@ function createMain ({ cloud, getRuntimeEnv, ingestion = runIngestion, storeFact
         await db.collection('intel_runs').doc(TIMER_STATUS_ID).set({
           data: {
             phase,
+            scheduledAt: checks.validTime ? new Date(event.Time).toISOString() : null,
             eventTimer: checks.eventTimer,
             expectedName: checks.expectedName,
             validTime: checks.validTime,
@@ -87,7 +91,7 @@ function createMain ({ cloud, getRuntimeEnv, ingestion = runIngestion, storeFact
       }
     }
 
-    if (!trustedTimer || !validTimerEnvelope(event, wxContext, runtimeEnv)) {
+    if (!trustedTimer || !validTimerEnvelope(event, wxContext, authEnv)) {
       if (trustedTimer) await writeStatus('rejected')
       else await writeRejectedAudit()
       return { ok: false, code: 'INVALID_TRIGGER' }
@@ -105,7 +109,7 @@ function createMain ({ cloud, getRuntimeEnv, ingestion = runIngestion, storeFact
     try {
       const db = sdk.database({ throwOnNotFound: false })
       const store = storeFactory(db)
-      const result = await ingestion({ store })
+      const result = await ingestion({ store, maxRetries: 1 })
       await writeStatus('completed')
       return { ...result, at: now }
     } catch (error) {

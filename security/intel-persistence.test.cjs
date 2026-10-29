@@ -71,7 +71,7 @@ test('CloudBase storage persists item, checkpoint, and run metadata across retri
 })
 
 test('timer is disabled by default and authenticated by runtime source plus required envelope fields', async () => {
-  assert.deepEqual(await crawler._test.createMain({ cloud: { init () {}, getWXContext: () => ({}), database: () => ({ runTransaction: async () => {} }) }, getRuntimeEnv: () => ({}), processEnv: {} })({ Type: 'timer', TriggerName: 'intelCrawlerSixHours', Time: new Date().toISOString() }), {
+  assert.deepEqual(await crawler._test.createMain({ cloud: { init () {}, getWXContext: () => ({}), database: () => ({ runTransaction: async () => {} }) }, getRuntimeEnv: () => ({}), processEnv: {} })({ Type: 'timer', TriggerName: crawler._test.TRIGGER_NAME, Time: new Date().toISOString() }), {
     ok: false, code: 'INVALID_TRIGGER'
   })
   const valid = { Type: 'timer', TriggerName: crawler._test.TRIGGER_NAME, Time: '2026-10-29T00:00:00.000Z' }

@@ -1,0 +1,55 @@
+{
+  "date": "2026-10-29",
+  "realIngestion": {
+    "status": "success",
+    "sources": [
+      {
+        "sourceId": "huggingface-transformers-releases",
+        "status": "success",
+        "fetched": 10,
+        "addedOrUpdated": 10,
+        "stage": "completed"
+      },
+      {
+        "sourceId": "chipsalliance-chisel-releases",
+        "status": "success",
+        "fetched": 10,
+        "addedOrUpdated": 10,
+        "stage": "completed"
+      }
+    ],
+    "at": "2026-10-29T08:08:02.298Z"
+  },
+  "databaseCounts": [
+    [
+      {
+        "_id": "semiconductor",
+        "total": {
+          "$numberInt": "25"
+        }
+      },
+      {
+        "_id": "ai",
+        "total": {
+          "$numberInt": "30"
+        }
+      }
+    ]
+  ],
+  "triggers": [
+    {
+      "TriggerName": "intelCrawlerEvery6Hours",
+      "TriggerDesc": "{\"cron\":\"0 0 */6 * * * *\"}",
+      "Enable": 1,
+      "AvailableStatus": "Available",
+      "BindStatus": "on"
+    }
+  ],
+  "testScripts": 21,
+  "failedTests": [],
+  "uiChecks": [
+    "real AI and semiconductor list",
+    "real Chisel detail and source/date",
+    "pagination 20 -> 40 -> 55, end state"
+  ]
+}

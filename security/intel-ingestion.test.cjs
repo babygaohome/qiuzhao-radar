@@ -14,14 +14,14 @@ test('ordinary invocation and event flags cannot enable cloud ingestion', async 
 
 test('exact host and path are required and caller supplied URLs are rejected', () => {
   const source = SOURCES[0]
-  const good = `https://api.github.com/repos/${source.owner}/${source.repo}/releases?per_page=30`
+  const good = `https://api.github.com/repos/${source.owner}/${source.repo}/releases?per_page=10`
   assert.equal(validateUrl(good, source).hostname, 'api.github.com')
-  assert.throws(() => validateUrl('https://api.github.com/repos/attacker/anything/releases?per_page=30', { id: 'attacker', owner: 'attacker', repo: 'anything' }), /source_not_allowed/)
+  assert.throws(() => validateUrl('https://api.github.com/repos/attacker/anything/releases?per_page=10', { id: 'attacker', owner: 'attacker', repo: 'anything' }), /source_not_allowed/)
   for (const bad of [good.replace('api.github.com', '127.0.0.1'), good.replace('/repos/', '/redirect/'), `${good}&url=https://evil.test`, good.replace('https:', 'http:')]) assert.throws(() => validateUrl(bad, source))
 })
 
 test('redirects are rejected and oversized body is aborted', async () => {
-  const source = SOURCES[0]; const url = `https://api.github.com/repos/${source.owner}/${source.repo}/releases?per_page=30`
+  const source = SOURCES[0]; const url = `https://api.github.com/repos/${source.owner}/${source.repo}/releases?per_page=10`
   async function fake(statusCode, body, headers = {}) {
     return requestJson(url, { request: (_url, _options, cb) => {
       const req = new EventEmitter(); req.setTimeout = () => {}; req.end = () => { const res = new EventEmitter(); res.statusCode = statusCode; res.headers = headers; res.resume = () => {}; cb(res); if (body) { res.emit('data', Buffer.from(body)); res.emit('end') } }; req.destroy = err => req.emit('error', err); return req

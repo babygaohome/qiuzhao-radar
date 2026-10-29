@@ -57,7 +57,7 @@ test('trusted timer with a rejected envelope stores only boolean checks and a ph
   assert.equal(writes.length, 1)
   assert.equal(writes[0].id, '__timer_status__')
   assert.deepEqual(writes[0].value.data, {
-    phase: 'rejected', eventTimer: false, expectedName: false, validTime: false, errorCode: null,
+    phase: 'rejected', scheduledAt: null, eventTimer: false, expectedName: false, validTime: false, errorCode: null,
     at: writes[0].value.data.at
   })
   assert.equal(typeof writes[0].value.data.at, 'number')
@@ -77,7 +77,7 @@ test('authenticated execution failure records accepted then failed without raw e
   ])
   assert.equal(writes[1].value.data.errorCode, -502005)
   assert.equal(JSON.stringify(writes).includes(secretMessage), false)
-  assert.deepEqual(Object.keys(writes[1].value.data).sort(), ['at', 'errorCode', 'eventTimer', 'expectedName', 'phase', 'validTime'])
+  assert.deepEqual(Object.keys(writes[1].value.data).sort(), ['at', 'errorCode', 'eventTimer', 'expectedName', 'phase', 'scheduledAt', 'validTime'])
 })
 
 test('SDK context flag takes precedence, missing context flag uses process fallback, gateway cannot log', async () => {
@@ -110,10 +110,37 @@ test('rejected audit is fixed-shape, excludes attacker data, and is throttled', 
   assert.equal((await main(event)).code, 'INVALID_TRIGGER')
   assert.equal(writes.length, 1)
   assert.equal(writes[0].id, '__timer_rejections__')
-  assert.deepEqual(Object.keys(writes[0].value.data).sort(), ['at', 'eventTimer', 'expectedName', 'phase', 'trustedTimer', 'validTime'])
+  assert.deepEqual(Object.keys(writes[0].value.data).sort(), ['at', 'eventTimer', 'expectedName', 'fromGateway', 'hasIdentity', 'phase', 'runtimeTimer', 'sourceClass', 'trustedTimer', 'validTime'])
   assert.deepEqual({ ...writes[0].value.data, at: 0 }, {
-    trustedTimer: false, phase: 'rejected', eventTimer: true, expectedName: true, validTime: true, at: 0
+    trustedTimer: false, sourceClass: 'empty', runtimeTimer: false, hasIdentity: false, fromGateway: false, phase: 'rejected', eventTimer: true, expectedName: true, validTime: true, at: 0
   })
   assert.equal(JSON.stringify(writes).includes('secret'), false)
   assert.equal(writes.some(write => write.id === '__timer_status__'), false)
+})
+
+
+test('platform-only mode is server configured and still rejects client identity and gateway', async () => {
+  const event = {Type:'Timer',TriggerName:_test.TRIGGER_NAME,Time:new Date().toISOString()}
+  const allowed = harness({ runtimeEnv:{INFOFLOW_INGESTION_ENABLED:'true'}, processEnv:{INFOFLOW_PLATFORM_ONLY:'true'} })
+  assert.equal((await allowed.main(event)).ok,true)
+  const client = harness({ runtimeEnv:{INFOFLOW_INGESTION_ENABLED:'true'}, processEnv:{INFOFLOW_PLATFORM_ONLY:'true'}, wxContext:{OPENID:'client'} })
+  assert.equal((await client.main(event)).code,'INVALID_TRIGGER')
+  const gateway = harness({ runtimeEnv:{INFOFLOW_INGESTION_ENABLED:'true'}, processEnv:{INFOFLOW_PLATFORM_ONLY:'true'}, wxContext:{SOURCE:'tcbgw'} })
+  assert.equal((await gateway.main(event)).code,'INVALID_TRIGGER')
+  const forged = harness()
+  assert.equal((await forged.main({...event,INFOFLOW_PLATFORM_ONLY:'true'})).code,'INVALID_TRIGGER')
+})
+
+
+test('observed wx_trigger runtime is accepted only in configured platform mode', async () => {
+ const event={Type:'timer',TriggerName:_test.TRIGGER_NAME,Time:new Date().toISOString()}
+ const h=harness({runtimeEnv:{INFOFLOW_INGESTION_ENABLED:'true'},processEnv:{INFOFLOW_PLATFORM_ONLY:'true'},wxContext:{SOURCE:'wx_trigger'}})
+ assert.equal((await h.main(event)).ok,true)
+ const client=harness({runtimeEnv:{INFOFLOW_INGESTION_ENABLED:'true'},processEnv:{INFOFLOW_PLATFORM_ONLY:'true'},wxContext:{SOURCE:'wx_trigger',OPENID:'client'}})
+ assert.equal((await client.main(event)).code,'INVALID_TRIGGER')
+})
+
+test('retired trigger never initializes SDK or accesses the database', async () => {
+  const main = _test.createMain({ cloud: { init () { throw Error('must not initialize') } }, getRuntimeEnv () { throw Error('must not read context') } })
+  assert.deepEqual(await main({ TriggerName: 'intelCrawlerSixHours' }), { ok: false, code: 'RETIRED_TRIGGER' })
 })

@@ -1,20 +1,20 @@
 security/catalog-audit.test.cjs: exit 0
-✔ inventory snapshots all actual title sources, excludes private/non-public rows, and repeated start preserves work (24.084542ms)
-✔ extractors do not use notes and drop known reseller links (0.8495ms)
-✔ inventory uses at most four concurrent durable inserts and retries a failed batch without skipping a company (9.555834ms)
-✔ JSON-LD requires exact employer and exact role; tracks cohort and current open status separately (0.983584ms)
-✔ verify checks every title and writes an isolated catalogAudit field while preserving manual review (1.722625ms)
-✔ matching JSON-LD without an explicit official-host mapping is evidence, not verification (1.021708ms)
-✔ search quota remains unresolved and does not turn a search snippet into evidence (0.773417ms)
-✔ a known reposting site is filtered before fetching and cannot verify a role (0.662334ms)
-✔ active lock prevents concurrent inventory and initial pass never claims full completion with unresolved work (0.912167ms)
-✔ inventory failure leaves cursor unchanged so the same page is retried safely (0.649292ms)
-✔ company catalog write failure stays write_pending and retries idempotently (0.968333ms)
-✔ default verify call inventories a bounded page and verifies available companies before inventory completes (35.141875ms)
-✔ queue state cannot count as verified before its company patch is confirmed (0.191083ms)
-✔ changed company titles remain a conflict instead of verifying an obsolete snapshot (0.524208ms)
-✔ browser job evidence survives background parsing and is published only after application (0.949375ms)
-✔ a crawler title change between evidence read and write cannot publish a verified company (0.714167ms)
+✔ inventory snapshots all actual title sources, excludes private/non-public rows, and repeated start preserves work (13.87525ms)
+✔ extractors do not use notes and drop known reseller links (0.685458ms)
+✔ inventory uses at most four concurrent durable inserts and retries a failed batch without skipping a company (11.718041ms)
+✔ JSON-LD requires exact employer and exact role; tracks cohort and current open status separately (0.909458ms)
+✔ verify checks every title and writes an isolated catalogAudit field while preserving manual review (1.766041ms)
+✔ matching JSON-LD without an explicit official-host mapping is evidence, not verification (0.917667ms)
+✔ search quota remains unresolved and does not turn a search snippet into evidence (0.703167ms)
+✔ a known reposting site is filtered before fetching and cannot verify a role (0.533916ms)
+✔ active lock prevents concurrent inventory and initial pass never claims full completion with unresolved work (0.661625ms)
+✔ inventory failure leaves cursor unchanged so the same page is retried safely (0.526875ms)
+✔ company catalog write failure stays write_pending and retries idempotently (1.063875ms)
+✔ default verify call inventories a bounded page and verifies available companies before inventory completes (30.908708ms)
+✔ queue state cannot count as verified before its company patch is confirmed (0.144375ms)
+✔ changed company titles remain a conflict instead of verifying an obsolete snapshot (0.473125ms)
+✔ browser job evidence survives background parsing and is published only after application (0.893ms)
+✔ a crawler title change between evidence read and write cannot publish a verified company (0.642375ms)
 ℹ tests 16
 ℹ suites 0
 ℹ pass 16
@@ -22,17 +22,17 @@ security/catalog-audit.test.cjs: exit 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 85.017
+ℹ duration_ms 70.773958
 
 security/catalog-corrections.test.cjs: exit 0
 PASS correction snapshot ordering, conditional/idempotent application, visibility and title conflicts, conservative state and failure reporting
 
 security/catalog-quality.test.cjs: exit 0
-✔ checks only actual title fields and leaves the input arrays untouched (2.047666ms)
-✔ does not flag concrete job titles that include recruitment-year wording (0.940833ms)
-✔ flags an overall campus recruitment announcement but not a concrete role headline (0.546875ms)
-✔ does not infer a missing title from note and skips private or non-public records (0.083083ms)
-✔ caps issue output and does not claim existence, freshness, or verification (0.298ms)
+✔ checks only actual title fields and leaves the input arrays untouched (1.901125ms)
+✔ does not flag concrete job titles that include recruitment-year wording (1.1075ms)
+✔ flags an overall campus recruitment announcement but not a concrete role headline (0.533625ms)
+✔ does not infer a missing title from note and skips private or non-public records (0.073375ms)
+✔ caps issue output and does not claim existence, freshness, or verification (0.260042ms)
 ℹ tests 5
 ℹ suites 0
 ℹ pass 5
@@ -40,23 +40,23 @@ security/catalog-quality.test.cjs: exit 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 8.427375
+ℹ duration_ms 8.150084
 
 security/client-catalog-policy.test.cjs: exit 0
 client catalog policy tests passed (6 groups)
 
 security/crawler-refresh.test.cjs: exit 0
-✔ crawler trigger schedules a check every thirty minutes, including overnight (0.773791ms)
-✔ a source cursor advances only when every planned request succeeds (0.777583ms)
-✔ successful empty pages count as successful fetches; a failed fetch does not (0.073417ms)
-✔ metadata copied from a database record drops the reserved document id (0.06675ms)
-✔ database write pool stays within the configured concurrency bound (1.920417ms)
-{"at":"2026-10-29T02:10:42.668Z","fetched":{"niuqi":0,"qiuzhaowang":0,"givemeoc":0,"offerstar":0,"jobup":0,"hust":0},"pages":{"qiuzhaowang":[1,5,6,7],"givemeoc":[1,9,10,11,12,13],"jobup":[1,7],"hust":[1,4],"niuqiDeep":"electronicscircuitsemiconductor"},"companies":0,"added":0,"addedBySource":{},"updated":0,"skippedStale":0,"auditConflicts":0,"removed":0,"links":0,"ms":12,"sources":{"qiuzhaowang":{"status":"ok","requests":4,"planned":4,"ms":1},"givemeoc":{"status":"ok","requests":6,"planned":6,"ms":1},"niuqi":{"status":"ok","requests":8,"planned":8,"ms":1},"offerstar":{"status":"ok","requests":1,"planned":1,"ms":0},"jobup":{"status":"ok","requests":2,"planned":2,"ms":0},"hust":{"status":"ok","requests":2,"planned":2,"ms":0}},"status":"ok"}
-✔ main lifecycle records a successful crawl and advances completed source cursors (13.770167ms)
-{"at":"2026-10-29T02:10:42.672Z","fetched":{"niuqi":0,"qiuzhaowang":0,"givemeoc":0,"offerstar":0,"jobup":0,"hust":0},"pages":{"qiuzhaowang":[1,5,6,7],"givemeoc":[1,9,10,11,12,13],"jobup":[1,7],"hust":[1,4],"niuqiDeep":"electronicscircuitsemiconductor"},"companies":0,"added":0,"addedBySource":{},"updated":0,"skippedStale":0,"auditConflicts":0,"removed":0,"links":0,"ms":3,"sources":{"qiuzhaowang":{"status":"failed","requests":1,"planned":4,"ms":0},"givemeoc":{"status":"failed","requests":1,"planned":6,"ms":0},"niuqi":{"status":"failed","requests":2,"planned":8,"ms":0},"offerstar":{"status":"failed","requests":1,"planned":1,"ms":0},"jobup":{"status":"failed","requests":1,"planned":2,"ms":0},"hust":{"status":"failed","requests":1,"planned":2,"ms":0}},"status":"error"}
-✔ all-source failure preserves last success and cursors and does not refresh catalog metadata (2.929292ms)
-✔ write-pool failure waits for in-flight writes before rejecting (6.370333ms)
-✔ changed empty maps use explicit replacement instead of an empty SDK update (0.174916ms)
+✔ crawler trigger schedules a check every thirty minutes, including overnight (0.761125ms)
+✔ a source cursor advances only when every planned request succeeds (0.747709ms)
+✔ successful empty pages count as successful fetches; a failed fetch does not (0.066958ms)
+✔ metadata copied from a database record drops the reserved document id (0.065125ms)
+✔ database write pool stays within the configured concurrency bound (1.781708ms)
+{"at":"2026-10-29T08:10:58.159Z","fetched":{"niuqi":0,"qiuzhaowang":0,"givemeoc":0,"offerstar":0,"jobup":0,"hust":0},"pages":{"qiuzhaowang":[1,5,6,7],"givemeoc":[1,9,10,11,12,13],"jobup":[1,7],"hust":[1,4],"niuqiDeep":"electronicscircuitsemiconductor"},"companies":0,"added":0,"addedBySource":{},"updated":0,"skippedStale":0,"auditConflicts":0,"removed":0,"links":0,"ms":9,"sources":{"qiuzhaowang":{"status":"ok","requests":4,"planned":4,"ms":2},"givemeoc":{"status":"ok","requests":6,"planned":6,"ms":0},"niuqi":{"status":"ok","requests":8,"planned":8,"ms":0},"offerstar":{"status":"ok","requests":1,"planned":1,"ms":0},"jobup":{"status":"ok","requests":2,"planned":2,"ms":0},"hust":{"status":"ok","requests":2,"planned":2,"ms":0}},"status":"ok"}
+✔ main lifecycle records a successful crawl and advances completed source cursors (10.743292ms)
+{"at":"2026-10-29T08:10:58.163Z","fetched":{"niuqi":0,"qiuzhaowang":0,"givemeoc":0,"offerstar":0,"jobup":0,"hust":0},"pages":{"qiuzhaowang":[1,5,6,7],"givemeoc":[1,9,10,11,12,13],"jobup":[1,7],"hust":[1,4],"niuqiDeep":"electronicscircuitsemiconductor"},"companies":0,"added":0,"addedBySource":{},"updated":0,"skippedStale":0,"auditConflicts":0,"removed":0,"links":0,"ms":3,"sources":{"qiuzhaowang":{"status":"failed","requests":1,"planned":4,"ms":0},"givemeoc":{"status":"failed","requests":1,"planned":6,"ms":0},"niuqi":{"status":"failed","requests":2,"planned":8,"ms":0},"offerstar":{"status":"failed","requests":1,"planned":1,"ms":0},"jobup":{"status":"failed","requests":1,"planned":2,"ms":0},"hust":{"status":"failed","requests":1,"planned":2,"ms":0}},"status":"error"}
+✔ all-source failure preserves last success and cursors and does not refresh catalog metadata (3.097334ms)
+✔ write-pool failure waits for in-flight writes before rejecting (6.620167ms)
+✔ changed empty maps use explicit replacement instead of an empty SDK update (0.111958ms)
 ℹ tests 9
 ℹ suites 0
 ℹ pass 9
@@ -64,7 +64,7 @@ security/crawler-refresh.test.cjs: exit 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 30.02825
+ℹ duration_ms 26.870084
 
 security/detail-review.test.cjs: exit 0
 PASS real detail-page load uses review-aware status without asserting unverified recruitment is ongoing
@@ -82,14 +82,14 @@ security/infoflow.test.cjs: exit 0
 InfoFlow contract, API route identity/default flag, page events/races/errors: PASS
 
 security/intel-ingestion.test.cjs: exit 0
-✔ ordinary invocation and event flags cannot enable cloud ingestion (229.726166ms)
-✔ exact host and path are required and caller supplied URLs are rejected (0.399125ms)
-✔ redirects are rejected and oversized body is aborted (0.562042ms)
-✔ normalization preserves metadata and makes absent publish dates visibly unknown (0.464666ms)
-✔ retries transient failures, deduplicates ids, isolates failed sources, and checkpoints only after writes (1003.70625ms)
-✔ failed writes preserve older items and do not advance checkpoint (1.134375ms)
-✔ lease conflicts do not start fetching and release runs after errors (0.595333ms)
-✔ rate limiting defers all sources and malformed links are skipped (0.97625ms)
+✔ ordinary invocation and event flags cannot enable cloud ingestion (1.540584ms)
+✔ exact host and path are required and caller supplied URLs are rejected (0.484542ms)
+✔ redirects are rejected and oversized body is aborted (0.898375ms)
+✔ normalization preserves metadata and makes absent publish dates visibly unknown (0.924833ms)
+✔ retries transient failures, deduplicates ids, isolates failed sources, and checkpoints only after writes (1004.556ms)
+✔ failed writes preserve older items and do not advance checkpoint (0.906125ms)
+✔ lease conflicts do not start fetching and release runs after errors (0.340792ms)
+✔ rate limiting defers all sources and malformed links are skipped (0.589084ms)
 ℹ tests 8
 ℹ suites 0
 ℹ pass 8
@@ -97,12 +97,30 @@ security/intel-ingestion.test.cjs: exit 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 1242.888833
+ℹ duration_ms 1014.215167
+
+security/intel-network.test.cjs: exit 0
+✔ hard HTTP deadline covers a request that never establishes a socket (17.4835ms)
+✔ requests pin IPv4 and report a stalled TLS stage without exposing network details (17.602875ms)
+✔ IPv4 request completes through the response and body stages (1.353833ms)
+✔ ECONNRESET is retried and successful response settles normally (1.734542ms)
+✔ rate limits are not retried (0.214666ms)
+✔ a permanent failure remains isolated to its source (0.192625ms)
+✔ ingestion persists only an allowlisted network stage for source failures (0.164291ms)
+✔ DNS name-not-found is not classified as transient (0.126583ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 42.71675
 
 security/intel-persistence.test.cjs: exit 0
-✔ lease expires, takeover fences stale writes, and only current token releases it (2.314209ms)
-✔ CloudBase storage persists item, checkpoint, and run metadata across retries without secrets (2.475ms)
-✔ timer is disabled by default and authenticated by runtime source plus required envelope fields (146.37125ms)
+✔ lease expires, takeover fences stale writes, and only current token releases it (2.0305ms)
+✔ CloudBase storage persists item, checkpoint, and run metadata across retries without secrets (2.245ms)
+✔ timer is disabled by default and authenticated by runtime source plus required envelope fields (0.401542ms)
 ℹ tests 3
 ℹ suites 0
 ℹ pass 3
@@ -110,11 +128,11 @@ security/intel-persistence.test.cjs: exit 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 157.110667
+ℹ duration_ms 8.90375
 
 security/intel-repository.test.cjs: exit 0
-✔ repository reads only published projected intel_items in bounded deterministic _id batches (2.591333ms)
-✔ crawler fetchedAt refresh does not invalidate a signed public snapshot cursor (1.150041ms)
+✔ repository reads only published projected intel_items in bounded deterministic _id batches (2.482125ms)
+✔ crawler fetchedAt refresh does not invalidate a signed public snapshot cursor (0.985583ms)
 ℹ tests 2
 ℹ suites 0
 ℹ pass 2
@@ -122,7 +140,7 @@ security/intel-repository.test.cjs: exit 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 7.541792
+ℹ duration_ms 7.126083
 
 security/isolation.test.cjs: exit 0
 PASS 249 assertions: user isolation, authorization, encrypted/chunked backup, evidence, quotas and crawler regressions
@@ -143,15 +161,18 @@ security/web-entrypoint.test.cjs: exit 0
 PASS integrated auth entrypoint: trusted runtime UID, event spoof rejection, safe diagnostics, web approval, timer protection, WeChat continuity and fail-closed SDK errors
 
 cloudfunctions/intelCrawler/security/intel-entry.test.cjs: exit 0
-✔ caller supplied timer fields cannot create timer status or run ingestion (2.437166ms)
-✔ trusted timer with a rejected envelope stores only boolean checks and a phase (0.24375ms)
-✔ authenticated execution failure records accepted then failed without raw errors (0.2795ms)
-✔ SDK context flag takes precedence, missing context flag uses process fallback, gateway cannot log (0.139791ms)
-ℹ tests 4
+✔ caller supplied timer fields cannot create trusted timer status or run ingestion (1.801459ms)
+✔ trusted timer with a rejected envelope stores only boolean checks and a phase (0.86175ms)
+✔ authenticated execution failure records accepted then failed without raw errors (0.223166ms)
+✔ SDK context flag takes precedence, missing context flag uses process fallback, gateway cannot log (0.174875ms)
+✔ rejected audit is fixed-shape, excludes attacker data, and is throttled (0.167125ms)
+✔ platform-only mode is server configured and still rejects client identity and gateway (0.245875ms)
+✔ observed wx_trigger runtime is accepted only in configured platform mode (0.151667ms)
+ℹ tests 7
 ℹ suites 0
-ℹ pass 4
+ℹ pass 7
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 7.689209
+ℹ duration_ms 8.200292
