@@ -2,6 +2,7 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
 const vm = require('node:vm')
+const coverage = require('../cloudfunctions/api/audit-coverage.js')
 // Reuse the established isolated SDK harness; do not execute its regression runner.
 const file = path.join(__dirname, 'isolation.test.cjs')
 const source = fs.readFileSync(file, 'utf8').split('let passed = 0')[0]
@@ -14,7 +15,9 @@ async function main () {
   assert.equal(h.box.exports._test.maintenancePartial({officialWatch:{ok:false}}), true)
   assert.equal(h.box.exports._test.maintenancePartial({audit:{failed:2},campaign:{orig:3}}), false)
   const put = (col, id, data) => h.table(col).set(id, { _id: id, ...data })
-  put('companies', 'public', { company: 'Public', industry: '银行', source: 'curated', dl: '9999-12-31' })
+  const publicAudit = { company: 'Public', positions: ['柜员'] }
+  put('companies', 'public', { ...publicAudit, industry: '银行', source: 'curated', dl: '9999-12-31', catalogAudit: { state: 'verified', coverageComplete: true, coverageFingerprint: coverage.coverageFingerprint(publicAudit), proofMethod: 'browser_official', jobs: { 柜员: { exists: true, cohort: 'matched', open: true, officialSource: 'confirmed' } } } })
+  put('companies', 'unverified', { company: 'Old flag only', industry: '银行', source: 'curated', v: 'official', dl: '9999-12-31' })
   put('companies', 'privateB', { company: 'B only', industry: '银行', source: 'manual', owner: 'B', dl: '9999-12-31' })
   const original = h.db.collection.bind(h.db)
   let aggregates = 0, counts = 0
@@ -46,6 +49,7 @@ async function main () {
   const list = await h.call('A', 'list', { withFacets: false })
   assert.equal(list.items.length, 1)
   assert.equal(list.items[0]._id, 'public')
+  assert(!list.items.some(x => x._id === 'unverified'), 'legacy official flag without complete role audit must stay out of verified list')
   assert.equal(counts, 0, 'fast list must not run collection counts')
   assert.equal(aggregates, 0, 'fast list must not wait for facets')
   const summary = await h.call('A', 'listSummary', {})
