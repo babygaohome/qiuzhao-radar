@@ -20,12 +20,13 @@ function presentItem (item) {
     displaySummaryStatus: STATUS_LABELS[item && item.summaryStatus] || '摘要状态未知',
     displayType,
     displayTitle: item && item.title || (item && item.version ? `${displayType} ${item.version}` : '标题未知'),
-    displayOriginalUrl: item && typeof item.originalUrl === 'string' && /^https:\/\//i.test(item.originalUrl) ? item.originalUrl : ''
+    displayOriginalUrl: item && typeof item.originalUrl === 'string' && /^https:\/\//i.test(item.originalUrl) ? item.originalUrl : '',
+    feedback: Object.assign({ liked: false, bookmarked: false, disliked: false }, item && item.feedback || {})
   })
 }
 
 Page({
-  data: { item: null, itemId: '', loading: true, error: '', demo: false, enabled: false },
+  data: { item: null, itemId: '', loading: true, error: '', demo: false, enabled: false, feedbackBusy: false, feedbackError: '' },
   onLoad (options) {
     this.alive = true
     this.seq = 0
@@ -79,5 +80,20 @@ Page({
   onCopyLink () {
     const url = this.data.item && this.data.item.displayOriginalUrl
     if (typeof url === 'string' && /^https:\/\//i.test(url)) copyLink(url)
+  },
+  async onFeedback (event) {
+    const action = event.currentTarget.dataset.action
+    if (!this.data.enabled || this.data.demo || this.data.feedbackBusy || !this.itemId || !['like', 'unlike', 'bookmark', 'unbookmark', 'dislike', 'undislike'].includes(action)) return
+    this.setData({ feedbackBusy: true, feedbackError: '' })
+    try {
+      const result = await api('intelFeedback', { itemId: this.itemId, feedbackAction: action })
+      if (!this.alive) return
+      const state = result && result.state || {}
+      this.setData({ item: Object.assign({}, this.data.item, { feedback: Object.assign({}, this.data.item.feedback, { liked: !!state.liked, bookmarked: !!state.bookmarked, disliked: !!state.disliked }) }) })
+    } catch (error) {
+      if (this.alive) this.setData({ feedbackError: (error && error.message) || '操作失败，请重试' })
+    } finally {
+      if (this.alive) this.setData({ feedbackBusy: false })
+    }
   }
 })

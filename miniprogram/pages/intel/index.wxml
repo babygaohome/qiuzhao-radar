@@ -1,9 +1,10 @@
 <view class="intel-page">
   <view class="intel-hero">
-    <view class="intel-eyebrow">INDUSTRY BRIEFING</view>
-    <view class="intel-heading">今日情报</view>
+    <view class="intel-eyebrow">INDUSTRY INTELLIGENCE</view>
+    <view class="intel-heading">行业情报</view>
     <view class="intel-subtitle">AI、半导体与电子产业公开信息</view>
     <view wx:if="{{digestAtLabel}}" class="intel-updated">{{digestAtLabel}}</view>
+    <view class="intel-settings-link" bindtap="onOpenPreferences">兴趣与简报设置 ›</view>
   </view>
 
   <view wx:if="{{demo}}" class="intel-notice intel-notice-demo">演示内容 · 非真实资讯</view>
@@ -29,6 +30,7 @@
     </view>
 
     <view wx:if="{{items.length > 0}}" class="intel-list">
+      <view wx:if="{{refreshing}}" class="intel-more-state">正在刷新列表…</view>
       <view wx:if="{{error}}" class="intel-inline-error">更新失败，仍显示上次加载的内容。<text class="intel-inline-link" bindtap="onRetry">重试</text></view>
       <view wx:for="{{items}}" wx:key="id" class="intel-card" data-id="{{item.id}}" bindtap="onOpenItem">
         <view class="intel-card-meta">
@@ -43,9 +45,15 @@
           <text class="intel-summary-status">{{item.displaySummaryStatus}}</text>
         </view>
         <view class="intel-card-open">查看来源与详情 <text class="intel-arrow">›</text></view>
+        <view wx:if="{{!demo}}" class="intel-feedback" catchtap="noop">
+          <button class="intel-feedback-button {{item.feedback.liked ? 'is-on' : ''}}" loading="{{feedbackBusyId === item.id}}" disabled="{{feedbackBusyId === item.id}}" data-id="{{item.id}}" data-action="{{item.feedback.liked ? 'unlike' : 'like'}}" catchtap="onFeedback">{{item.feedback.liked ? '撤销喜欢' : '喜欢'}}</button>
+          <button class="intel-feedback-button {{item.feedback.bookmarked ? 'is-on' : ''}}" loading="{{feedbackBusyId === item.id}}" disabled="{{feedbackBusyId === item.id}}" data-id="{{item.id}}" data-action="{{item.feedback.bookmarked ? 'unbookmark' : 'bookmark'}}" catchtap="onFeedback">{{item.feedback.bookmarked ? '取消收藏' : '收藏'}}</button>
+          <button class="intel-feedback-button {{item.feedback.disliked ? 'is-on' : ''}}" loading="{{feedbackBusyId === item.id}}" disabled="{{feedbackBusyId === item.id}}" data-id="{{item.id}}" data-action="{{item.feedback.disliked ? 'undislike' : 'dislike'}}" catchtap="onFeedback">{{item.feedback.disliked ? '撤销不感兴趣' : '不感兴趣'}}</button>
+          <text wx:if="{{item.feedbackError}}" class="intel-feedback-error">{{item.feedbackError}}</text>
+        </view>
       </view>
       <view wx:if="{{loadingMore}}" class="intel-more-state">正在加载更多…</view>
-      <view wx:elif="{{moreError}}" class="intel-more-state">{{moreError}} <text class="intel-inline-link" bindtap="onRetryMore">重试</text></view>
+      <view wx:elif="{{moreError}}" class="intel-more-state">{{moreError}} <button wx:if="{{cursorConflict}}" class="intel-refresh-button" loading="{{loading}}" disabled="{{loading}}" bindtap="onRefreshFeed">刷新列表</button><text wx:else class="intel-inline-link" bindtap="onRetryMore">重试</text></view>
       <button wx:elif="{{nextCursor}}" class="intel-more-button" loading="{{loadingMore}}" disabled="{{loadingMore}}" bindtap="loadMore">加载更多</button>
       <view wx:elif="{{!loading && !nextCursor}}" class="intel-end">已显示当前读取窗口内的全部内容</view>
     </view>

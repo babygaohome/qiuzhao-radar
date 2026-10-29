@@ -1,0 +1,48 @@
+<view class="preferences-page">
+  <view class="preferences-hero">
+    <view class="preferences-eyebrow">YOUR PREFERENCES</view>
+    <view class="preferences-title">设置你的情报偏好</view>
+    <view class="preferences-copy">只使用你在这里主动选择的主题，不读取简历、投递材料或 Offer 来推断兴趣。</view>
+  </view>
+
+  <view wx:if="{{loading}}" class="preferences-state">正在加载你的设置…</view>
+  <view wx:elif="{{error && !loaded}}" class="preferences-state">
+    <view>{{error}}</view><button class="preferences-button" bindtap="onRetry">重试</button>
+  </view>
+  <block wx:else>
+    <view class="preferences-section">
+      <view class="preferences-section-title">你关注哪些频道</view>
+      <view class="preferences-hint">已选频道的内容会优先排在列表前面。细分兴趣、资讯语言和显式反馈目前只保存，不参与筛选或排序。</view>
+      <view class="preferences-chips">
+        <view wx:for="{{topicChoices}}" wx:key="key" class="preferences-chip {{item.selected ? 'is-selected' : ''}}" data-key="{{item.key}}" bindtap="onToggleTopic">{{item.label}}<text>{{item.selected ? ' ✓' : ' +'}}</text></view>
+      </view>
+    </view>
+
+    <view class="preferences-section">
+      <view class="preferences-section-title">细分兴趣偏好</view>
+      <view class="preferences-hint">目前只保存选择；资讯列表暂未按细分兴趣筛选或排序。</view>
+      <view class="preferences-chips">
+        <view wx:for="{{subtopicChoices}}" wx:key="key" class="preferences-chip {{item.selected ? 'is-selected' : ''}}" data-key="{{item.key}}" bindtap="onToggleSubtopic">{{item.label}}</view>
+      </view>
+    </view>
+
+    <view class="preferences-section">
+      <view class="preferences-section-title">每日简报偏好</view>
+      <view class="preferences-row"><view><view class="preferences-label">启用每日简报偏好</view><view class="preferences-hint">当前版本尚未生成站内简报；此处只保存设置，不会触发微信通知。</view></view><switch checked="{{dailyDigestEnabled}}" color="#3156D3" bindchange="onDigestChange" /></view>
+      <view class="preferences-field"><text>偏好时间</text><picker mode="time" value="{{digestLocalTime}}" bindchange="onTimeChange"><view class="preferences-picker">{{digestLocalTime}}　›</view></picker></view>
+      <view class="preferences-field"><text>时区</text><input class="preferences-input" value="{{timezone}}" placeholder="例如 Asia/Shanghai" bindinput="onTimezoneChange" /></view>
+      <view class="preferences-section-title preferences-language-title">资讯语言</view>
+      <view class="preferences-language-row"><view data-key="zh" bindtap="onLanguageChange">{{languageZh ? '☑' : '□'}}　中文</view><view data-key="en" bindtap="onLanguageChange">{{languageEn ? '☑' : '□'}}　English</view></view>
+    </view>
+
+    <view class="preferences-section">
+      <view class="preferences-section-title">行为学习</view>
+      <view class="preferences-row"><view><view class="preferences-label">阅读行为学习</view><view class="preferences-hint">当前版本不会收集阅读行为。此开关保持关闭。</view></view><switch checked="{{behaviorLearningEnabled}}" disabled="{{!behaviorLearningEnabled}}" color="#3156D3" bindchange="onLearningChange" /></view>
+      <view class="preferences-hint">喜欢、收藏和“不感兴趣”会保存为你的主动反馈，可在资讯卡片或详情页撤销；当前版本尚未用这些反馈调整推荐顺序。</view>
+    </view>
+
+    <view wx:if="{{error}}" class="preferences-error">{{error}}</view>
+    <view wx:if="{{saved}}" class="preferences-success">设置已保存</view>
+    <button class="preferences-button preferences-save" loading="{{saving}}" disabled="{{loading || saving}}" bindtap="onSave">保存设置</button>
+  </block>
+</view>

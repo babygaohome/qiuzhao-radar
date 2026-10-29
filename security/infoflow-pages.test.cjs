@@ -156,6 +156,34 @@ async function flagsAndDetail () {
   assert.equal(writes, 0)
 }
 
-Promise.resolve().then(listPageBehavior).then(flagsAndDetail).then(() => {
+async function paginationConflictRefresh () {
+  const requests = []
+  const definition = pageFrom(path.join(root, 'miniprogram/pages/intel/index.js'), {
+    '../../utils/util.js': { api (action, data) { const call = deferred(); requests.push({ action, data, ...call }); return call.promise } },
+    '../../config.js': { intelEnabled: true, intelDemoMode: false },
+    './demo-fixtures.js': []
+  })
+  const page = instance(definition)
+  page.onLoad(); page.onShow()
+  requests[0].resolve({ items: [{ id: 'one', title: 'One' }], nextCursor: 'cursor-v1' })
+  await pendingTick()
+  page.loadMore()
+  requests[1].reject({ code: 'conflict', message: '资讯排序或反馈状态已更新，请刷新列表' })
+  await pendingTick()
+  assert.equal(page.data.cursorConflict, true)
+  assert.match(page.data.moreError, /刷新列表/)
+  page.onRefreshFeed()
+  assert.equal(requests.length, 3)
+  assert.equal(requests[2].data.cursor, undefined, 'refresh restarts at the first page without stale cursor')
+  assert.equal(page.data.refreshing, true)
+  requests[2].resolve({ items: [{ id: 'one', title: 'One refreshed' }, { id: 'two', title: 'Two' }], nextCursor: 'cursor-v2' })
+  await pendingTick()
+  assert.equal(page.data.cursorConflict, false)
+  assert.equal(page.data.refreshing, false)
+  assert.deepEqual(page.data.items.map(item => item.id), ['one', 'two'])
+  assert.equal(page.data.nextCursor, 'cursor-v2')
+}
+
+Promise.resolve().then(listPageBehavior).then(flagsAndDetail).then(paginationConflictRefresh).then(() => {
   process.stdout.write('InfoFlow page pagination, race cancellation, flags, retries and labels: PASS\n')
 }).catch(error => { console.error(error); process.exitCode = 1 })

@@ -1,0 +1,23 @@
+.preferences-page { min-height: 100vh; padding: 24rpx 28rpx 120rpx; color: var(--ink); }
+.preferences-hero, .preferences-section, .preferences-state { padding: 26rpx; border: 1rpx solid var(--line); border-radius: 22rpx; background: var(--surface); box-shadow: var(--shadow); }
+.preferences-eyebrow { color: var(--accent); font-size: 18rpx; letter-spacing: 3rpx; font-weight: 700; }
+.preferences-title { margin-top: 8rpx; font-size: 34rpx; font-weight: 750; }
+.preferences-copy, .preferences-hint { margin-top: 8rpx; color: var(--muted); font-size: 21rpx; line-height: 1.55; }
+.preferences-section { margin-top: 18rpx; }
+.preferences-section-title { color: var(--ink); font-size: 25rpx; font-weight: 700; }
+.preferences-chips { display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 18rpx; }
+.preferences-chip { padding: 10rpx 18rpx; border: 1rpx solid var(--line); border-radius: 999rpx; color: var(--muted); background: var(--surface); font-size: 22rpx; }
+.preferences-chip.is-selected { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); font-weight: 650; }
+.preferences-row { display: flex; justify-content: space-between; align-items: center; gap: 20rpx; margin-top: 20rpx; }
+.preferences-label { color: var(--ink); font-size: 23rpx; font-weight: 600; }
+.preferences-field { display: flex; justify-content: space-between; align-items: center; gap: 18rpx; margin-top: 22rpx; color: var(--muted); font-size: 22rpx; }
+.preferences-picker, .preferences-input { min-width: 260rpx; padding: 12rpx 16rpx; border: 1rpx solid var(--line); border-radius: 12rpx; color: var(--ink); background: var(--sunk); text-align: right; font-size: 22rpx; }
+.preferences-language-title { margin-top: 24rpx; }
+.preferences-language-row { display: flex; gap: 40rpx; margin-top: 14rpx; color: var(--muted); font-size: 22rpx; }
+.preferences-error { margin-top: 16rpx; color: var(--bad); font-size: 22rpx; }
+.preferences-success { margin-top: 16rpx; color: var(--ok); font-size: 22rpx; }
+.preferences-button { min-height: 76rpx; padding: 0 28rpx; border: 0; border-radius: 999rpx; background: var(--accent); color: #fff; font-size: 24rpx; }
+.preferences-button::after { border: 0; }
+.preferences-save { width: 100%; margin-top: 20rpx; }
+.preferences-state { margin-top: 22rpx; color: var(--muted); text-align: center; font-size: 23rpx; }
+@media (prefers-color-scheme: dark) { .preferences-button { color: #101722; } }

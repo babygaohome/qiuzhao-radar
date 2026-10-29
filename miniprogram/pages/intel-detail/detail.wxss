@@ -16,6 +16,11 @@
 .intel-detail-link::after, .intel-detail-action::after { border: 0; }
 .intel-detail-unknown { margin-top: 12rpx; color: var(--muted); font-size: 22rpx; }
 .intel-detail-evidence-row { margin-top: 12rpx; color: var(--accent); font-size: 22rpx; line-height: 1.6; overflow-wrap: anywhere; word-break: break-all; }
+.intel-detail-feedback { margin-top: 26rpx; padding-top: 22rpx; border-top: 1rpx solid var(--line); }
+.intel-detail-feedback-row { display: flex; flex-wrap: wrap; gap: 10rpx; margin-top: 8rpx; }
+.intel-detail-feedback-row .intel-detail-link { margin-top: 10rpx; }
+.intel-detail-feedback-row .is-on { border-color: var(--accent); background: var(--accent-soft); }
+.intel-detail-feedback-error { margin-top: 8rpx; color: var(--bad); font-size: 21rpx; }
 .intel-detail-state { margin-top: 24rpx; text-align: center; }
 .intel-detail-state-title { color: var(--ink); font-size: 26rpx; font-weight: 680; }
 .intel-detail-state-copy { margin-top: 10rpx; color: var(--muted); font-size: 22rpx; line-height: 1.6; overflow-wrap: anywhere; }

@@ -1,6 +1,7 @@
 'use strict'
 
 const crypto = require('crypto')
+const { readOptionalDocument } = require('./preferences')
 
 const CATEGORIES = new Set(['all', 'jobs', 'ai', 'semiconductor', 'electronics'])
 const ITEM_CATEGORIES = new Set(['jobs', 'ai', 'semiconductor', 'electronics'])
@@ -69,6 +70,29 @@ function createIntelHandlers (options) {
     : (typeof process !== 'undefined' && process.env && process.env[CURSOR_SECRET_ENV] || '')
 
   const secret = typeof configuredSecret === 'string' && configuredSecret.length >= 32 ? configuredSecret : ''
+  async function readPersonalSignals (openid) {
+    if (!options.db) return { preferences: { revision: 0, topics: {} }, generation: 0, feedback: new Map() }
+    const preferences = await readOptionalDocument(options.db, 'intel_preferences', openid)
+    if (preferences && preferences.deleted === true) return { preferences: { revision: preferences.revision || 0, topics: {} }, generation: preferences.generation || 0, feedback: new Map() }
+    const generation = preferences && Number.isSafeInteger(preferences.generation) ? preferences.generation : 0
+    const feedbackResult = await options.db.collection('intel_feedback').where({ openid }).limit(1000).get()
+    const feedback = (feedbackResult.data || []).filter(row => (row.generation || 0) === generation)
+    const byItem = new Map(feedback.map(row => [row.itemId, row.state || {}]))
+    return { preferences: preferences || { revision: 0, topics: {} }, generation, feedback: byItem }
+  }
+  function explicitTopicOrder (rows, preferences) {
+    const topics = preferences && preferences.topics
+    const subscribed = new Set(isRecord(topics) ? Object.entries(topics).filter(([topic, weight]) => ITEM_CATEGORIES.has(topic) && typeof weight === 'number' && weight > 0).map(([topic]) => topic) : [])
+    if (!subscribed.size) return rows
+    return rows.slice().sort((a, b) => {
+      const aPriority = subscribed.has(a.category) ? 0 : 1
+      const bPriority = subscribed.has(b.category) ? 0 : 1
+      return aPriority - bPriority || compareItems(a, b)
+    })
+  }
+  function withFeedback (items, feedback) {
+    return items.map(item => Object.assign({}, item, { feedback: Object.assign({ liked: false, bookmarked: false, disliked: false }, feedback.get(item.id) || {}) }))
+  }
 
   async function intelFeed (event, openid) {
     if (typeof openid !== 'string' || !openid.trim()) return failure('unauthenticated', '请通过微信小程序登录后使用')
@@ -82,27 +106,35 @@ function createIntelHandlers (options) {
 
     let rows
     let windowLimited = false
+    let signals
     try {
       const source = await readItems()
       if (!Array.isArray(source)) return failure('server_error', '资讯暂不可用')
       windowLimited = source.windowLimited === true
+      signals = await readPersonalSignals(openid)
       rows = source.filter(row => row && row.status === 'published' && (category === 'all' || row.category === category))
         .filter(row => typeof row.id === 'string' && ID.test(row.id))
         .sort(compareItems)
+      rows = explicitTopicOrder(rows, signals.preferences)
     } catch (_) { return failure('server_error', '资讯暂不可用') }
 
-    // Cursor snapshots cover only fields returned to clients. Crawler metadata such as
-    // fetchedAt changes on every refresh and must not invalidate an otherwise stable page.
-    const snapshotRows = rows.map(publicItem)
-    const snapshot = crypto.createHash('sha256').update(JSON.stringify(snapshotRows)).digest('hex')
+    // Bind the cursor to the exact personalized ordering, visible feedback states,
+    // and preference revision. Crawler-only fields such as fetchedAt stay excluded.
+    const snapshotRows = withFeedback(rows.map(publicItem), signals.feedback)
+    const selectedTopics = isRecord(signals.preferences.topics)
+      ? Object.entries(signals.preferences.topics).filter(([topic, weight]) => ITEM_CATEGORIES.has(topic) && typeof weight === 'number' && weight > 0).sort(([a], [b]) => a.localeCompare(b))
+      : []
+    const snapshot = crypto.createHash('sha256').update(JSON.stringify({ revision: signals.preferences.revision || 0, selectedTopics, rows: snapshotRows })).digest('hex')
     const owner = userHash(openid)
     let offset = 0
     if (event.cursor !== undefined && event.cursor !== null && event.cursor !== '') {
       try {
         const cursor = decodeCursor(event.cursor, secret)
-        if (cursor.v !== CURSOR_VERSION || cursor.u !== owner || cursor.c !== category || cursor.s !== snapshot ||
-            cursor.l !== limit || !Number.isSafeInteger(cursor.o) || cursor.o < 1 || cursor.o >= rows.length ||
+        if (cursor.v !== CURSOR_VERSION || cursor.u !== owner || cursor.c !== category ||
+            cursor.l !== limit || !Number.isSafeInteger(cursor.o) || cursor.o < 1 ||
             !Number.isSafeInteger(cursor.e) || cursor.e <= now()) throw new Error('cursor binding mismatch')
+        if (cursor.s !== snapshot) return failure('conflict', '资讯排序或反馈状态已更新，请刷新列表')
+        if (cursor.o >= rows.length) throw new Error('cursor offset invalid')
         offset = cursor.o
       } catch (_) { return failure('bad_request', '分页游标无效或已过期') }
     }
@@ -126,7 +158,9 @@ function createIntelHandlers (options) {
       if (!Array.isArray(items)) return failure('server_error', '资讯暂不可用')
       const item = items.find(row => row && row.status === 'published' && row.id === event.id)
       if (!item) return failure('not_found', '这条资讯暂不可用')
-      return { item: publicItem(item) }
+      const signals = await readPersonalSignals(openid)
+      const [enriched] = withFeedback([publicItem(item)], signals.feedback)
+      return { item: enriched }
     } catch (_) { return failure('server_error', '资讯暂不可用') }
   }
 

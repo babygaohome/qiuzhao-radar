@@ -25,6 +25,8 @@ const catalogAuditModule = require('./catalog-audit')
 const auditCoverage = require('./audit-coverage')
 const catalogQuality = require('./catalog-quality')
 const intel = require('./intel/handlers')
+const intelPreferences = require('./intel/preferences')
+const { readOptionalDocument, markIntelDeleted } = intelPreferences
 // User paused the full-catalog review on 2026-10-22. Keep existing results.
 const CATALOG_AUDIT_PAUSED = true
 
@@ -202,9 +204,14 @@ async function listSummary (ev, openid, prof) {
 const handlers = {}
 // Live crawler records remain opt-in until the collection and cursor secret are deployed.
 Object.assign(handlers, intel.createIntelHandlers({
+  db,
   enabled: process.env.INTEL_ENABLED === 'true',
   cursorSecret: process.env.INFOFLOW_CURSOR_SECRET || '',
   readItems: intel.createReadItems(db)
+}))
+Object.assign(handlers, intelPreferences.createPreferenceHandlers({
+  db,
+  takeLimit: (openid, kind, limit) => takeQuota(openid, kind, limit, kind === 'intelFeedback' ? '情报反馈' : '情报设置')
 }))
 handlers.publicJobsStatus = async () => {
   const record=await readDoc('meta','publicJobsLast')
@@ -839,8 +846,13 @@ handlers.clearAiPrefs = async (ev, openid) => {
 // 删除我的全部数据：投递记录（含日程、岗位卡、内推码）、网申材料、Offer、AI 偏好、隐藏的公司、提醒、自己添加的公司
 handlers.deleteAllMine = async (ev, openid) => {
   if (ev.confirm !== '确认删除') throw new AppError('invalid', '请输入「确认删除」')
+  // Mark first so an in-flight feedback write can detect deletion and clean up.
+  const deletion = await markIntelDeleted(db, openid, _, () => new Date().toISOString())
+  await db.collection('intel_feedback').where({ openid, generation: _.lt(deletion.generation) }).remove()
+  await db.collection('intel_feedback').where({ openid, generation: _.exists(false) }).remove()
+  await db.collection('intel_digests').where({ openid }).remove()
   const apps = await db.collection('apps').where({ openid }).remove()
-  const rem = await db.collection('reminders').where({ openid }).remove().catch(() => ({ stats: { removed: 0 } }))
+  const rem = await db.collection('reminders').where({ openid }).remove()
   await db.collection('preps').where({ openid }).remove()
   const own = await db.collection('companies').where({ source: 'manual', owner: openid }).remove()
   // 个人记录只留下每日次数的计数（不然删一次数据就能绕过次数限制），其余全部清掉
@@ -848,6 +860,9 @@ handlers.deleteAllMine = async (ev, openid) => {
   const keep = {}
   Object.keys(p).filter(k => /(Day|Count)$/.test(k)).forEach(k => { keep[k] = p[k] })
   if (p._id) await db.collection('profiles').doc(openid).set({ data: keep })
+  await db.collection('intel_feedback').where({ openid, generation: _.lt(deletion.generation) }).remove()
+  await db.collection('intel_feedback').where({ openid, generation: _.exists(false) }).remove()
+  await db.collection('intel_digests').where({ openid }).remove()
   return { apps: apps.stats.removed, reminders: rem.stats.removed, companies: own.stats.removed }
 }
 
@@ -858,12 +873,24 @@ handlers.exportMine = async (ev, openid) => {
     .map(a => ({ cid: a.cid, company: a.company, status: a.status, note: a.note, appliedAt: a.appliedAt, events: a.events || [], referral: a.referral || '',
       tracks: a.tracks || [], failStage: a.failStage || '', lesson: a.lesson || '' }))
   const p = await getProfileDoc(openid)
+  const intelPrefsDoc = await readOptionalDocument(db, 'intel_preferences', openid)
+  const intelPreferences = intelPrefsDoc && intelPrefsDoc.deleted !== true
+    ? Object.fromEntries(['topics', 'subtopics', 'blockedTopics', 'languages', 'timezone', 'digestLocalTime', 'dailyDigestEnabled', 'behaviorLearningEnabled', 'revision'].filter(k => intelPrefsDoc[k] !== undefined).map(k => [k, intelPrefsDoc[k]]))
+    : null
+  const intelFeedbackResult = await db.collection('intel_feedback').where({ openid }).limit(1000).get()
+  const activeGeneration = intelPrefsDoc && Number.isSafeInteger(intelPrefsDoc.generation) ? intelPrefsDoc.generation : 0
+  const intelFeedback = intelPrefsDoc && intelPrefsDoc.deleted === true ? [] : (intelFeedbackResult.data || [])
+    .filter(x => (x.generation || 0) === activeGeneration)
+    .map(x => ({ itemId: x.itemId, state: x.state || {}, reason: x.reason || '', updatedAt: x.updatedAt || '' }))
+  const intelDigestResult = await db.collection('intel_digests').where({ openid }).limit(1000).get()
+  const intelDigests = (intelDigestResult.data || []).map(x => Object.fromEntries(['localDate', 'timezone', 'algorithmVersion', 'itemIds', 'jobCompanyIds', 'generatedAt', 'status'].filter(k => x[k] !== undefined).map(k => [k, x[k]])))
   const companies = (await db.collection('companies').where({ source: 'manual', owner: openid }).limit(1000).get()).data
     .map(c => ({ id: c._id, company: c.company, industry: c.industry, ctype: c.ctype, batch: c.batch, openDate: c.openDate,
       deadline: c.deadline, rolling: !c.deadline && c.deadlineText === '招满即止', url: c.url, note: c.note, cities: c.cities, exam: c.exam }))
   const snapshot = await snapshotCurrent(p)
   const plans = snapshot.plans.map(x => ({ id: x.id, name: x.name, profile: x.profile ? cleanProfile(x.profile) : null }))
   return { app: '秋招雷达', v: 2, at: new Date().toISOString(), apps, companies, plans, curPlan: snapshot.cur,
+    intel: { preferences: intelPreferences, feedback: intelFeedback, digests: intelDigests },
     profile: p.profile || null, materials: p.materials || [], offers: p.offers || [], hidden: p.hidden || [] }
 }
 function validatedBackup (d) {
@@ -3028,7 +3055,7 @@ async function chatJSON (prompt, quick) {
 
 // ---------------------------------------------------------------- 入口
 
-// 第一次运行时建好需要的集合（已存在会报错，忽略即可）
+// 新版资讯集合必须由运维预建并配置拒绝客户端读写的规则。
 let collectionsReady = null
 function ensureCollections () {
   if (!collectionsReady) {
