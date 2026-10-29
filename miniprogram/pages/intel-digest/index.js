@@ -7,6 +7,25 @@ function formatDate (value) {
   return value.replace(/-/g, '.')
 }
 
+function publishedDateLabel (value) {
+  if (typeof value !== 'string' || !value) return '发布时间未知'
+  const timestamp = Date.parse(value)
+  if (!Number.isFinite(timestamp)) return '发布时间未知'
+  const dateText = value.slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateText)) return '发布时间未知'
+  const [year, month, day] = dateText.split('-').map(Number)
+  const calendarDate = new Date(Date.UTC(year, month - 1, day))
+  if (calendarDate.getUTCFullYear() !== year || calendarDate.getUTCMonth() !== month - 1 || calendarDate.getUTCDate() !== day) return '发布时间未知'
+  const timeText = value.slice(11, 19)
+  if (timeText && /^\d{2}:\d{2}:\d{2}$/.test(timeText)) {
+    const [hour, minute, second] = timeText.split(':').map(Number)
+    if (hour > 23 || minute > 59 || second > 59) return '发布时间未知'
+  }
+  const date = new Date(timestamp)
+  const pad = number => String(number).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
 function presentDigestItem (item) {
   if (!item || typeof item !== 'object' || Array.isArray(item)) return null
   const itemId = typeof item.itemId === 'string' ? item.itemId : ''
@@ -17,6 +36,7 @@ function presentDigestItem (item) {
     title: typeof item.title === 'string' && item.title.trim() ? item.title.trim() : '标题暂不可用',
     sourceName: typeof item.sourceName === 'string' && item.sourceName.trim() ? item.sourceName.trim() : '来源信息暂不可用',
     publishedAt: typeof item.publishedAt === 'string' ? item.publishedAt : '',
+    publishedDate: publishedDateLabel(item.publishedAt),
     reason: typeof item.reason === 'string' ? item.reason : '',
     originalUrl,
     feedback: { bookmarked: !!(item.feedback && item.feedback.bookmarked) },
@@ -294,4 +314,4 @@ function normalizeHistoryRows (rows) {
 
 Page(pageDefinition)
 
-module.exports = { pageDefinition, presentDigestItem, presentDigestJob, formatDate, normalizeHistoryRows }
+module.exports = { pageDefinition, presentDigestItem, presentDigestJob, formatDate, publishedDateLabel, normalizeHistoryRows }

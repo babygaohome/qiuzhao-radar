@@ -11,14 +11,15 @@ function deferred () { let resolve; let reject; const promise = new Promise((yes
 function makePage (api, wx = {}) {
   let definition
   const filename = path.join(root, 'miniprogram/pages/intel-digest/index.js')
+  const pageModule = { exports: {} }
   vm.runInNewContext(fs.readFileSync(filename, 'utf8'), {
     Page (value) { definition = value },
     require (name) { assert.equal(name, '../../utils/util.js'); return { api } },
     wx: Object.assign({ navigateTo () {} }, wx),
-    module: { exports: {} },
+    module: pageModule,
     URL
   }, { filename })
-  return Object.assign({}, definition, { data: JSON.parse(JSON.stringify(definition.data)), setData (value) { Object.assign(this.data, value) } })
+  return Object.assign({}, definition, { helpers: pageModule.exports, data: JSON.parse(JSON.stringify(definition.data)), setData (value) { Object.assign(this.data, value) } })
 }
 
 function makeIntelPage (config, wx = {}) {
@@ -41,6 +42,12 @@ function makeIntelPage (config, wx = {}) {
 
 async function run () {
   const calls = []
+  const dated = makePage(() => Promise.resolve({ digest: null }))
+  const expectedLocalDate = (() => { const date = new Date('2026-10-29T00:00:00Z'); const pad = number => String(number).padStart(2, '0'); return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` })()
+  assert.equal(dated.helpers.publishedDateLabel('2026-10-29T00:00:00Z'), expectedLocalDate, 'ISO timestamps render in the device-local date format used by the intelligence list')
+  assert.equal(dated.helpers.publishedDateLabel('not-a-date'), '发布时间未知')
+  assert.equal(dated.helpers.publishedDateLabel('2026-02-30T00:00:00Z'), '发布时间未知', 'invalid calendar dates are not normalized into invented dates')
+  assert.equal(dated.helpers.presentDigestItem({ itemId: 'date-1', publishedAt: '2026-10-29T00:00:00Z' }).publishedDate, expectedLocalDate)
   const page = makePage((action, data) => { const req = deferred(); calls.push({ action, data, ...req }); return req.promise })
   page.onLoad()
   assert.equal(calls[0].action, 'intelDigestToday')
@@ -326,6 +333,8 @@ async function run () {
 
   const markup = fs.readFileSync(path.join(root, 'miniprogram/pages/intel-digest/index.wxml'), 'utf8')
   assert.doesNotMatch(markup, /微信通知|邮件推送|示例资讯|学历符合/)
+  assert.match(markup, /\{\{item\.itemCount\}\} 条内容/, 'history counts include news and jobs')
+  assert.doesNotMatch(markup, /\{\{item\.itemCount\}\} 条资讯/)
   assert.match(markup, /intelMarkDigestRead|onRetryMarkRead/)
   assert.match(markup, /catchtap="onToggleBookmark"/, 'bookmark controls do not bubble into article navigation')
   const app = JSON.parse(fs.readFileSync(path.join(root, 'miniprogram/app.json'), 'utf8'))
