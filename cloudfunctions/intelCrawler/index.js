@@ -3,41 +3,117 @@
 const { runIngestion } = require('./core')
 const { createCloudBaseStore } = require('./cloudbase-store')
 const TRIGGER_NAME = 'intelCrawlerSixHours'
+const TIMER_STATUS_ID = '__timer_status__'
+const TIMER_REJECTIONS_ID = '__timer_rejections__'
+const REJECTION_AUDIT_INTERVAL_MS = 60 * 1000
 
 function validTimerEnvelope (event, context, env = process.env) {
-  // TRIGGER_SRC is populated by the CloudBase runtime. Event fields alone are
-  // caller-controlled and therefore cannot authorize ingestion.
   if (env.TRIGGER_SRC !== 'timer') return false
-  if (!context || context.OPENID || context.UID || context.SOURCE === 'tcbgw') return false
+  if (!context || context.OPENID || context.UID || context.SOURCE === 'tcbgw' || context.TCB_SOURCE === 'tcbgw') return false
   return Boolean(event && typeof event.Type === 'string' && event.Type.toLowerCase() === 'timer' && event.TriggerName === TRIGGER_NAME &&
     typeof event.Time === 'string' && Number.isFinite(Date.parse(event.Time)))
 }
 
-exports.main = async function main (event, runtimeContext) {
-  if (process.env.INFOFLOW_INGESTION_ENABLED !== 'true') {
-    return { ok: false, code: 'INGESTION_DISABLED', message: 'This function is not configured for deployment.' }
-  }
-  const cloud = require('wx-server-sdk')
-  cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
-  const context = cloud.getWXContext()
-  if (context.OPENID || context.UID) return { ok: false, code: 'FORBIDDEN' }
-  // SDK merges trusted invocation context with process environment (concurrent runtimes).
-  const runtimeEnv = require('@cloudbase/node-sdk').getCloudbaseContext(runtimeContext)
-  if (!validTimerEnvelope(event, context, runtimeEnv)) {
-    console.warn(JSON.stringify({ code: 'INVALID_TRIGGER', runtimeTimer: runtimeEnv.TRIGGER_SRC === 'timer', eventTimer: !!(event && typeof event.Type === 'string' && event.Type.toLowerCase() === 'timer'), expectedName: !!(event && event.TriggerName === TRIGGER_NAME), validTime: !!(event && typeof event.Time === 'string' && Number.isFinite(Date.parse(event.Time))) }))
-    return { ok: false, code: 'INVALID_TRIGGER' }
-  }
-  const db = cloud.database()
-  const store = createCloudBaseStore(db)
-  const now = new Date().toISOString()
-  // Collections must be provisioned with client-deny rules before enabling ingestion.
-  try {
-    const result = await runIngestion({ store })
-    return { ...result, at: now }
-  } catch (_) {
-    // Do not return platform errors, URLs, response bodies, or credentials.
-    return { status: 'failed', code: 'INGESTION_FAILED', at: now }
+function eventChecks (event) {
+  return {
+    eventTimer: !!(event && typeof event.Type === 'string' && event.Type.toLowerCase() === 'timer'),
+    expectedName: !!(event && event.TriggerName === TRIGGER_NAME),
+    validTime: !!(event && typeof event.Time === 'string' && Number.isFinite(Date.parse(event.Time)))
   }
 }
 
-exports._test = { validTimerEnvelope, TRIGGER_NAME }
+function numericErrorCode (error) {
+  const code = error && (typeof error.code === 'number' ? error.code : error.errCode)
+  return typeof code === 'number' && Number.isFinite(code) ? code : null
+}
+
+function createMain ({ cloud, getRuntimeEnv, ingestion = runIngestion, storeFactory = createCloudBaseStore, processEnv = process.env } = {}) {
+  return async function main (event, runtimeContext) {
+    const sdk = cloud || require('wx-server-sdk')
+    sdk.init({ env: sdk.DYNAMIC_CURRENT_ENV })
+    const runtimeEnv = getRuntimeEnv
+      ? getRuntimeEnv(runtimeContext)
+      : require('@cloudbase/node-sdk').getCloudbaseContext(runtimeContext)
+    const wxContext = sdk.getWXContext() || {}
+    const hasIdentity = !!(wxContext.OPENID || wxContext.UID || runtimeEnv.WX_OPENID || runtimeEnv.UID)
+    const fromGateway = wxContext.SOURCE === 'tcbgw' || wxContext.TCB_SOURCE === 'tcbgw' || runtimeEnv.SOURCE === 'tcbgw' || runtimeEnv.TCB_SOURCE === 'tcbgw'
+    const trustedTimer = runtimeEnv.TRIGGER_SRC === 'timer' && !hasIdentity && !fromGateway
+    const checks = eventChecks(event)
+    const writeRejectedAudit = async () => {
+      if (trustedTimer) return
+      try {
+        const db = sdk.database({ throwOnNotFound: false })
+        await db.runTransaction(async tx => {
+          const doc = tx.collection('intel_runs').doc(TIMER_REJECTIONS_ID)
+          let previous = null
+          try {
+            const result = await doc.get()
+            if (result && result.data && !Array.isArray(result.data)) previous = result.data
+          } catch (error) {
+            if (!(error && (error.code === 'DATABASE_DOCUMENT_NOT_EXIST' || error.errCode === -502005))) throw error
+          }
+          const at = Date.now()
+          if (previous && Number(previous.at) > at - REJECTION_AUDIT_INTERVAL_MS) return
+          await doc.set({ data: {
+            trustedTimer: false,
+            phase: 'rejected',
+            eventTimer: checks.eventTimer,
+            expectedName: checks.expectedName,
+            validTime: checks.validTime,
+            at
+          } })
+        })
+      } catch (_) {
+        // Do not disclose datastore errors or request data in logs.
+        try { console.warn(JSON.stringify({ code: 'REJECTION_AUDIT_WRITE_FAILED' })) } catch (_) {}
+      }
+    }
+    const writeStatus = async (phase, errorCode = null) => {
+      if (!trustedTimer) return
+      try {
+        const db = sdk.database({ throwOnNotFound: false })
+        await db.collection('intel_runs').doc(TIMER_STATUS_ID).set({
+          data: {
+            phase,
+            eventTimer: checks.eventTimer,
+            expectedName: checks.expectedName,
+            validTime: checks.validTime,
+            errorCode: typeof errorCode === 'number' && Number.isFinite(errorCode) ? errorCode : null,
+            at: Date.now()
+          }
+        })
+      } catch (_) {
+        // Status is best-effort and must never expose SDK errors.
+      }
+    }
+
+    if (!trustedTimer || !validTimerEnvelope(event, wxContext, runtimeEnv)) {
+      if (trustedTimer) await writeStatus('rejected')
+      else await writeRejectedAudit()
+      return { ok: false, code: 'INVALID_TRIGGER' }
+    }
+    const enabled = runtimeEnv.INFOFLOW_INGESTION_ENABLED === undefined
+      ? processEnv.INFOFLOW_INGESTION_ENABLED
+      : runtimeEnv.INFOFLOW_INGESTION_ENABLED
+    if (enabled !== 'true') {
+      await writeStatus('rejected')
+      return { ok: false, code: 'INGESTION_DISABLED', message: 'This function is not configured for deployment.' }
+    }
+
+    await writeStatus('accepted')
+    const now = new Date().toISOString()
+    try {
+      const db = sdk.database({ throwOnNotFound: false })
+      const store = storeFactory(db)
+      const result = await ingestion({ store })
+      await writeStatus('completed')
+      return { ...result, at: now }
+    } catch (error) {
+      await writeStatus('failed', numericErrorCode(error))
+      return { status: 'failed', code: 'INGESTION_FAILED', at: now }
+    }
+  }
+}
+
+exports.main = createMain()
+exports._test = { validTimerEnvelope, TRIGGER_NAME, TIMER_STATUS_ID, TIMER_REJECTIONS_ID, REJECTION_AUDIT_INTERVAL_MS, eventChecks, numericErrorCode, createMain }

@@ -9,7 +9,7 @@ const crawler = require('../cloudfunctions/intelCrawler')
 const fixture = (id = 1, published_at = '2026-10-01T00:00:00Z') => ({ id, name: `release ${id}`, tag_name: `v${id}`, html_url: `https://github.com/${SOURCES[0].owner}/${SOURCES[0].repo}/releases/tag/v${id}`, published_at })
 
 test('ordinary invocation and event flags cannot enable cloud ingestion', async () => {
-  assert.deepEqual(await crawler.main({ triggerName: 'timer', enabled: true }), { ok: false, code: 'INGESTION_DISABLED', message: 'This function is not configured for deployment.' })
+  assert.deepEqual(await crawler._test.createMain({ cloud: { init () {}, getWXContext: () => ({}), database: () => ({ runTransaction: async () => {} }) }, getRuntimeEnv: () => ({}), processEnv: {} })({ triggerName: 'timer', enabled: true }), { ok: false, code: 'INVALID_TRIGGER' })
 })
 
 test('exact host and path are required and caller supplied URLs are rejected', () => {
