@@ -1,0 +1,68 @@
+<view class="wrap">
+  <view class="intro muted small">把拿到的 Offer 填进来，并排对比年包和条件，再让 AI 结合你看重的点给出建议。只有你自己能看到。</view>
+
+  <view class="imp" wx:if="{{importable.length}}" bindtap="importFromApps">「我的投递」里有 {{importable.length}} 家标了 Offer 还没填进来，点这里一键导入 ›</view>
+
+  <view class="card form" wx:if="{{editing}}">
+    <view class="two">
+      <view class="field"><text class="label">公司</text><input class="input" value="{{d.company}}" data-f="company" bindinput="onText" /></view>
+      <view class="field"><text class="label">岗位</text><input class="input" value="{{d.role}}" data-f="role" bindinput="onText" /></view>
+    </view>
+    <view class="two">
+      <view class="field"><text class="label">月薪（元）</text><input class="input" type="digit" value="{{d.monthly || ''}}" data-f="monthly" bindinput="onText" /></view>
+      <view class="field"><text class="label">每年几薪</text><input class="input" type="digit" value="{{d.months || ''}}" data-f="months" bindinput="onText" placeholder="如 15" /></view>
+    </view>
+    <view class="two">
+      <view class="field"><text class="label">年终奖（元/年）</text><input class="input" type="digit" value="{{d.bonus || ''}}" data-f="bonus" bindinput="onText" /></view>
+      <view class="field"><text class="label">公积金比例（%）</text><input class="input" type="digit" value="{{d.fundRate || ''}}" data-f="fundRate" bindinput="onText" placeholder="如 12" /></view>
+    </view>
+    <view class="two">
+      <view class="field"><text class="label">签字费（元，一次性）</text><input class="input" type="digit" value="{{d.signBonus || ''}}" data-f="signBonus" bindinput="onText" /></view>
+      <view class="field"><text class="label">安家费/房补（元，第一年）</text><input class="input" type="digit" value="{{d.housing || ''}}" data-f="housing" bindinput="onText" /></view>
+    </view>
+    <view class="two">
+      <view class="field"><text class="label">加班强度</text><picker range="{{wlbs}}" bindchange="onWlb"><view class="picker">{{d.wlb || '选择'}}</view></picker></view>
+      <view class="field"><text class="label">违约金（元）</text><input class="input" type="digit" value="{{d.penalty || ''}}" data-f="penalty" bindinput="onText" placeholder="三方协议里写的" /></view>
+    </view>
+    <view class="two">
+      <view class="field"><text class="label">城市</text><input class="input" value="{{d.city}}" data-f="city" bindinput="onText" /></view>
+      <view class="field"><text class="label">答复截止</text><picker mode="date" value="{{d.ddl}}" bindchange="onDdl"><view class="picker">{{d.ddl || '选择日期'}}</view></picker></view>
+    </view>
+    <label class="check"><switch checked="{{d.hukou}}" bindchange="onHukou" color="#1F4FD1" style="transform:scale(.7)" />解决户口</label>
+    <view class="field"><text class="label">备注</text><textarea class="textarea" value="{{d.notes}}" maxlength="200" placeholder="团队、发展方向、股票期权、试用期等" data-f="notes" bindinput="onText" /></view>
+    <view class="actions"><button class="btn" bindtap="cancel">取消</button><button class="btn primary" bindtap="save">保存</button></view>
+  </view>
+
+  <block wx:else>
+    <view class="actions"><button class="btn primary" bindtap="add">+ 添加 Offer</button></view>
+
+    <view class="empty" wx:if="{{loaded && !rows.length}}">还没有 Offer。拿到后填进来，就能在这里对比。</view>
+
+    <scroll-view scroll-x class="tablewrap" wx:if="{{rows.length}}">
+      <view class="table">
+        <view class="tr head"><view class="th">项目</view><view class="td" wx:for="{{rows}}" wx:key="id" data-i="{{index}}" bindtap="edit">{{item.company}} ✎</view></view>
+        <view class="tr" wx:for="{{fields}}" wx:for-item="f" wx:key="key">
+          <view class="th">{{f.label}}</view>
+          <view class="td {{f.key === 'annual' && item.best ? 'best' : ''}}" wx:for="{{rows}}" wx:key="id">{{item[f.key]}}</view>
+        </view>
+        <view class="tr"><view class="th"></view><view class="td del" wx:for="{{rows}}" wx:key="id" data-i="{{index}}" bindtap="remove">删除</view></view>
+      </view>
+    </scroll-view>
+
+    <view class="card ai" wx:if="{{rows.length >= 2}}">
+      <view class="field"><text class="label">你最看重什么</text>
+        <input class="input" value="{{priorities}}" maxlength="200" placeholder="如：成长空间 > 城市 > 薪资，想留上海" bindinput="onPriorities" /></view>
+      <view class="muted small">点击分析会把你填写的 Offer 数据和偏好发给智谱 AI 处理。</view>
+      <view class="actions"><button class="btn primary" bindtap="analyze" disabled="{{analyzing}}">{{analyzing ? 'AI 分析中，约 20 秒…' : 'AI 帮我分析'}}</button></view>
+      <view wx:if="{{analysis}}" class="ana">
+        <view class="sum">{{analysis.summary}}</view>
+        <view wx:for="{{analysis.ranking}}" wx:key="id" class="rk">
+          <view class="rn">{{index + 1}}. {{item.company}}</view>
+          <view class="pro">优势：{{item.pros}}</view>
+          <view class="con">顾虑：{{item.cons}}</view>
+        </view>
+        <view class="muted small">AI 只根据你填的数字和备注分析，最终请结合自己的判断。</view>
+      </view>
+    </view>
+  </block>
+</view>

@@ -1,0 +1,42 @@
+<view class="wrap">
+  <view class="intro">
+    <view class="p">秋招后半段容易被忽略、但竞争往往更小的机会，每 2 小时随数据一起更新：</view>
+    <view class="p">· <text class="b">截止延后</text>：最近 14 天内网申截止日期往后延了</view>
+    <view class="p">· <text class="b">补录 / 新批次</text>：批次或岗位里写了补录、第二批、加招、扩招等</view>
+    <view class="p">· <text class="b">刚发布就快截止</text>：5 天内才发布、14 天内就截止，知道的人少</view>
+  </view>
+
+  <scroll-view class="chips" scroll-x enable-flex wx:if="{{tabs.length}}">
+    <view wx:for="{{tabs}}" wx:key="k" class="fchip {{tab === item.k ? 'on' : ''}}" data-k="{{item.k}}" bindtap="onTab">{{item.t}}<text class="n">{{item.n}}</text></view>
+  </scroll-view>
+  <view class="bar" wx:if="{{loaded && !error}}">
+    <view class="fchip sm {{sort === 'score' ? 'on' : ''}}" data-k="score" bindtap="onSort" wx:if="{{scored}}">按和我的匹配度</view>
+    <view class="fchip sm {{sort === 'dl' ? 'on' : ''}}" data-k="dl" bindtap="onSort">按截止时间</view>
+    <text class="muted small hint2" wx:if="{{!scored}}" bindtap="goAI">在「AI 挑选」填好资料，就能按匹配度排序 ›</text>
+  </view>
+
+  <view class="list" wx:if="{{items.length}}">
+    <view wx:for="{{items}}" wx:key="id" class="item" hover-class="item-hover" data-id="{{item.id}}" bindtap="open">
+      <view class="main">
+        <view class="name-row">
+          <text class="name">{{item.company}}</text>
+          <text class="ps {{item.psCls}}" wx:if="{{item.ps != null}}">匹配 {{item.ps}}</text>
+          <text class="ind">{{item.industry}}</text>
+          <text class="vb {{item.badge.cls}}" wx:if="{{item.badge}}">{{item.badge.text}}</text>
+        </view>
+        <view class="kinds"><text class="kd" wx:for="{{item.kinds}}" wx:for-item="k" wx:key="*this">{{k}}</text></view>
+        <view class="why">{{item.why}}</view>
+        <view class="note" wx:if="{{item.note}}">{{item.note}}</view>
+        <view class="dates">{{item.datesText}}</view>
+      </view>
+      <view class="side">
+        <text class="cd {{item.cdCls}}">{{item.cdText}}</text>
+        <text class="chip {{item.status ? 's-' + item.status : 'none'}}">{{item.statusLabel}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty" wx:if="{{loaded && !error && !items.length}}">暂时没有{{tab === 'all' ? '捡漏机会' : '这一类'}}。补录和延期一般集中在 10–11 月，之后会越来越多。</view>
+  <view class="empty" wx:if="{{error}}">{{error}}</view>
+  <view class="empty" wx:if="{{!loaded}}">加载中…</view>
+</view>

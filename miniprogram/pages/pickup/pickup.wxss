@@ -1,0 +1,16 @@
+.intro { margin-bottom: 22rpx; background: var(--surface); border-radius: 28rpx; padding: 22rpx 28rpx; box-shadow: var(--shadow); border-left: 8rpx solid var(--warn); }
+.p { color: var(--muted); font-size: 25rpx; margin-top: 4rpx; }
+.b { color: var(--ink); font-weight: 600; }
+.chips { margin-bottom: 14rpx; }
+.bar { display: flex; align-items: center; flex-wrap: wrap; gap: 12rpx; margin-bottom: 16rpx; }
+.bar .fchip { margin-right: 0; }
+.fchip.sm { font-size: 24rpx; }
+.hint2 { color: var(--accent); }
+.kinds { margin-top: 8rpx; display: flex; flex-wrap: wrap; gap: 8rpx; }
+.kd { font-size: 21rpx; font-weight: 600; color: var(--warn); border: 1rpx solid var(--warn); border-radius: 8rpx; padding: 0 10rpx; }
+.why { font-size: 25rpx; margin-top: 6rpx; }
+.ps { font-size: 22rpx; font-weight: 700; padding: 2rpx 12rpx; border-radius: 999rpx; }
+.ps.hi { color: #fff; background: var(--ok); }
+.ps.mid { color: var(--accent); background: rgba(31, 79, 209, .1); }
+.ps.lo { color: var(--slate); background: rgba(75, 100, 121, .12); }
+.chips .fchip { flex: none; white-space: nowrap; align-self: center; }

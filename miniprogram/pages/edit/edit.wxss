@@ -1,0 +1,5 @@
+.intro { margin: 0 4rpx 20rpx; }
+.check { display: flex; align-items: center; font-size: 25rpx; color: var(--muted); margin-top: 16rpx; }
+
+.paste { margin-bottom: 24rpx; }
+.exist { margin-top: 16rpx; padding: 16rpx 20rpx; border-radius: 16rpx; background: rgba(31, 79, 209, .08); color: var(--accent); font-size: 26rpx; }

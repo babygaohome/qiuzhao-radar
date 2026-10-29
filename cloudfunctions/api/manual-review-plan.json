@@ -1,0 +1,187 @@
+{
+  "snapshotId": "manualReview20261022",
+  "companies": [
+    {
+      "id": "a0bd2ae58ec",
+      "company": "国家电网有限公司"
+    },
+    {
+      "id": "a60e2d9d448",
+      "company": "内蒙古仁昌商贸有限公司"
+    },
+    {
+      "id": "a70abece977",
+      "company": "物产中大云商有限公司"
+    },
+    {
+      "id": "a898ccfd206",
+      "company": "中国建筑第五工程局有限公司"
+    },
+    {
+      "id": "a04066c5c02",
+      "company": "哈尔滨鼎晟越商贸有限公司"
+    },
+    {
+      "id": "a608d841ad2",
+      "company": "浙江美硕电气科技股份有限公司"
+    },
+    {
+      "id": "a79b86ca3ba",
+      "company": "杭州微盖文化交流有限公司"
+    },
+    {
+      "id": "a98a512dee0",
+      "company": "国药控股股份有限公司"
+    },
+    {
+      "id": "aa3299bc094",
+      "company": "中国光大银行股份有限公司杭州分行"
+    },
+    {
+      "id": "a63ae54b661",
+      "company": "深圳明锐理想科技股份有限公司"
+    },
+    {
+      "id": "a73ce4952a7",
+      "company": "中交二航局特种"
+    },
+    {
+      "id": "a502466335b",
+      "company": "成都艺术职业大学"
+    }
+  ],
+  "reviews": [
+    {
+      "id": "a0bd2ae58ec",
+      "company": "国家电网有限公司",
+      "source": "auto",
+      "status": "unconfirmed",
+      "evidenceUrls": [
+        "https://zhaopin.sgcc.com.cn/sgcchr/static/unitPart.html?bullet_id=dcefb56d04714dc4b488d0a7a204bf76"
+      ],
+      "reason": "实际浏览国家电网官网2026-10-17发布的2027总公告，确认招聘项目真实；公告区分提前批及后续三批，常规第一批公告预计11月中旬发布，各单位报名截止各不相同。尚未逐一确认具体单位当前可投窗口，暂不把集团公告泛化为所有单位均在招。"
+    },
+    {
+      "id": "a60e2d9d448",
+      "company": "内蒙古仁昌商贸有限公司",
+      "source": "auto",
+      "status": "unconfirmed",
+      "evidenceUrls": [],
+      "reason": "今日自动抽检曾未找到高校发布的在招岗位。针对完整企业名称的公开检索未定位到可核对身份的企业官网及2027届职位，无法从企业官方确认当前仍接受投递。仅降为待复核，不认定企业虚假或招聘已结束。"
+    },
+    {
+      "id": "a70abece977",
+      "company": "物产中大云商有限公司",
+      "source": "auto",
+      "status": "open",
+      "evidenceUrls": [
+        "https://app.mokahr.com/campus-recruitment/wzgroup/44491?locale=zh-CN#/job/81dd299c-1370-454c-ab15-7c0833b976d5",
+        "https://career.nankai.edu.cn/correcruit/content/id/119918.html"
+      ],
+      "reason": "实际浏览云商Moka官方招聘门户，在招列表列有27届校招管培生（商务BD）等岗位，发布于2026-08-31；详情有申请职位入口。该岗明确隶属于云商下级子公司，不能当成本部岗位；具体用人主体需逐岗核对。门户未显示截止日，未采用转载的10/26日期。"
+    },
+    {
+      "id": "a898ccfd206",
+      "company": "中国建筑第五工程局有限公司",
+      "source": "auto",
+      "status": "unconfirmed",
+      "evidenceUrls": [
+        "https://5btm.cscec.com/",
+        "https://5btm.cscec.com/rlzz/xyzp/",
+        "https://www.cscec.com/",
+        "https://recruit.cscec.com/recruit#/index?contract_unit=32042531&company_id=1873",
+        "https://job.hust.edu.cn/zpinfo1/2441774.htm"
+      ],
+      "reason": "高校发布的2027招聘公告实际涉及五局土木子公司；可访问的企业人才页为旧届信息，集团官网招聘系统未能读到对应当前职位。不能把子公司或旧届公告当成本记录当前在招依据，暂列待复核。"
+    },
+    {
+      "id": "a04066c5c02",
+      "company": "哈尔滨鼎晟越商贸有限公司",
+      "source": "auto",
+      "status": "unconfirmed",
+      "evidenceUrls": [],
+      "reason": "今日自动抽检曾失败；当前库中仍有就业平台的法务助理岗位及高校来源标记。完整企业名称检索未找到可核对的企业官网和当前2027届投递入口，平台记录不足以替代企业官方确认。保留原来源，标为待复核；不认定虚假或已截止。"
+    },
+    {
+      "id": "a608d841ad2",
+      "company": "浙江美硕电气科技股份有限公司",
+      "source": "auto",
+      "status": "unconfirmed",
+      "evidenceUrls": [
+        "https://msrelay.cn/list_28.html",
+        "https://job.wzu.edu.cn/campus/view/id/495234",
+        "https://job.wzu.edu.cn/job/view/id/787246/from_type/4/from_id/495234"
+      ],
+      "reason": "温州大学就业网有2027招聘启事及岗位，企业官网可读的人才招聘列表仍为2023发布的信息，尚未从企业官网确认该批岗位当前开放。保留高校来源，转人工复核待确认；不据此认定虚假或已截止。"
+    },
+    {
+      "id": "a79b86ca3ba",
+      "company": "杭州微盖文化交流有限公司",
+      "source": "auto",
+      "status": "unconfirmed",
+      "evidenceUrls": [
+        "https://dji.ncss.cn/ncss/zt/2027jqqh.shtml"
+      ],
+      "reason": "教育部就业平台有高校发布的研学活动旅行顾问记录，但未找到可核对的企业官网、当前企业自主投递页或截止日。高校发布不能替代企业官网当前在招确认，暂列待复核。"
+    },
+    {
+      "id": "a98a512dee0",
+      "company": "国药控股股份有限公司",
+      "source": "auto",
+      "status": "open",
+      "evidenceUrls": [
+        "https://www.sinopharm.com/xyzp.html",
+        "https://sinopharm2027.iguopin.com/job",
+        "https://www.iguopin.com/job/detail?id=223533434838977198"
+      ],
+      "reason": "实际浏览2027国药校园招聘平台，直接列出用人单位国药控股股份有限公司的法务管理专员、合规管理专员。打开法务职位页确认2026-10-21更新、校招/应届生、硕士、用人单位自主招聘，页面有申请职位入口，报名截止2026-12-31 23:59:59。此截止仅针对该岗位，不代表全公司所有岗位；未点击申请或提交个人信息。"
+    },
+    {
+      "id": "aa3299bc094",
+      "company": "中国光大银行股份有限公司杭州分行",
+      "source": "auto",
+      "status": "unconfirmed",
+      "evidenceUrls": [
+        "https://www.cebbank.com/site/gryw/yglc/lccp8/zcgllcp/ty87/yzgg73/673370/index.html",
+        "https://campus.51job.com/cebbank/index1.htm",
+        "https://career.nankai.edu.cn/correcruit/content/id/119720.html",
+        "https://eoap.cebbank.com/uiap/wt/CEB/zpzh/detail?recruitType=1&level=2&orgId=50003986"
+      ],
+      "reason": "南开大学2026-10-13招聘启事写有2027秋招及11/8截止，官网ATS链接属于光大银行域名；但实际浏览ATS机构页及校园入口未返回有效岗位内容，无法核实当前仍可投递。保留启事，暂列待复核，不认定已截止。"
+    },
+    {
+      "id": "a63ae54b661",
+      "company": "深圳明锐理想科技股份有限公司",
+      "source": "auto",
+      "status": "unconfirmed",
+      "evidenceUrls": [
+        "https://www.magic-ray.com/about.html",
+        "https://www.magic-ray.com/join.html",
+        "https://www.magic-ray.com/job.html",
+        "https://job.xidian.edu.cn/campus/view/id/755508"
+      ],
+      "reason": "可核对企业官网身份及校园招聘联系方式；招聘页访问受限，检索到的高校公告为2026届，未能从企业官网确认当前2027届具体岗位及开放状态。暂列待复核。"
+    },
+    {
+      "id": "a73ce4952a7",
+      "company": "中交二航局特种",
+      "source": "auto",
+      "status": "unconfirmed",
+      "evidenceUrls": [
+        "https://www.sneb.com.cn/jzkjfgs/col1727/"
+      ],
+      "reason": "中交二航局官网可确认特种工程技术分公司这一主体，但未能核对该分公司的当前2027岗位和开放期限。主体真实不等于该记录当前在招；不能以集团其他公司的招聘替代，暂列待复核。"
+    },
+    {
+      "id": "a502466335b",
+      "company": "成都艺术职业大学",
+      "source": "auto",
+      "status": "unconfirmed",
+      "evidenceUrls": [
+        "https://www.cdau.edu.cn/",
+        "https://www.cqdx.gov.cn/web/article/1476964037542699008/web/content_1476964037542699008.html"
+      ],
+      "reason": "学校主体可核对，但未找到学校官网当前2027岗位及有效报名窗口；毕业生双选会或就业活动不能直接证明学校作为用人单位正在招聘。保留原始来源，暂列待复核。"
+    }
+  ]
+}

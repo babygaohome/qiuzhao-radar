@@ -1,0 +1,351 @@
+<view class="wrap" wx:if="{{c}}">
+  <view class="hero dhero">
+    <view class="title">{{c.company}}</view>
+    <view class="meta">{{c.industry}}<text wx:if="{{c.ctype}}"> · {{c.ctype}}</text><text wx:if="{{c.batch}}"> · {{c.batch}}</text>
+      <text class="tag" wx:for="{{c.tags}}" wx:key="*this">{{item}}</text></view>
+  </view>
+
+  <view class="card evbox {{evid.verified ? 'ok' : 'lead'}}">
+    <view class="evh">{{c.publicOnly && c.publicSource ? '人社公开岗位表 · 招聘对象见原文' : evid.verified ? '✓ 已核实 · ' + evid.level : '⚠ 待核实线索 · ' + evid.level}}<text class="evs">{{c.publicOnly && c.publicSource ? '已读取政府部门公开岗位表；不等同于企业官网核验，也不能推定为校招' : evid.summary}}</text></view>
+    <view wx:for="{{evid.lines}}" wx:key="k" class="evl"><text class="evk">{{item.k}}</text><text class="evv">{{item.v}}</text><text class="evc" wx:if="{{item.url}}" data-url="{{item.url}}" bindtap="copyEvid">复制</text></view>
+  </view>
+
+  <view class="card about" wx:if="{{info.intro || info.scale || about || webSearch}}">
+    <view class="ab-h">公司简介<text class="ab-tag" wx:if="{{info.scale}}">{{info.scale}}</text><text class="ab-tag" wx:if="{{c.ctype}}">{{c.ctype}}</text></view>
+    <block wx:if="{{info.intro}}">
+      <view class="ab-intro {{introOpen ? '' : 'clamp'}}" bindtap="toggleIntro">{{info.intro}}</view>
+      <view class="ab-more" wx:if="{{info.intro.length > 70}}" bindtap="toggleIntro">{{introOpen ? '收起 ▴' : '展开 ▾'}}</view>
+    </block>
+    <view class="ab-wel" wx:if="{{info.welfare.length}}"><text class="ab-k">福利</text><text wx:for="{{info.welfare}}" wx:key="*this" class="ab-w">{{item}}</text></view>
+    <view class="ab-src" wx:if="{{info.intro}}">摘自招聘公告{{info.srcFrom ? '（来源：' + info.srcFrom + '）' : ''}}</view>
+
+    <view class="ai-about" wx:if="{{about && about.none}}">
+      <view class="ab-sub">AI 联网了解<text class="ab-date">{{about.date}}</text></view>
+      <view class="ab-note">联网没搜到这家公司的可靠资料，建议直接看招聘公告或企业官网。{{about.note}}</view>
+    </view>
+    <view class="ai-about" wx:elif="{{about}}">
+      <view class="ab-sub">AI 联网了解<text class="ab-date">{{about.date}}</text></view>
+      <view class="ab-row" wx:if="{{about.business}}"><text class="ab-k">主营业务</text><text class="ab-v">{{about.business}}</text></view>
+      <view class="ab-row" wx:if="{{about.background}}"><text class="ab-k">背景</text><text class="ab-v">{{about.background}}</text></view>
+      <view class="ab-row" wx:if="{{about.hq}}"><text class="ab-k">总部 / 城市</text><text class="ab-v">{{about.hq}}</text></view>
+      <view class="ab-row" wx:if="{{about.news}}"><text class="ab-k">近期动态</text><text class="ab-v">{{about.news}}</text></view>
+      <view class="ab-row" wx:if="{{about.campus}}"><text class="ab-k">校招生关注</text><text class="ab-v">{{about.campus}}</text></view>
+      <view class="ab-row risk" wx:if="{{about.risk}}"><text class="ab-k">风险提示</text><text class="ab-v">{{about.risk}}</text></view>
+      <view class="ab-note" wx:if="{{about.note}}">{{about.note}}</view>
+      <view class="ab-refs" wx:if="{{about.refHosts.length}}">来源：<text wx:for="{{about.refHosts}}" wx:key="url" class="ab-ref" data-url="{{item.url}}" bindtap="copy">{{item.host}}</text></view>
+      <view class="ab-src">AI 根据联网搜索整理，仅供参考，以公司官方信息为准</view>
+    </view>
+    <view wx:if="{{webSearch && !about && c.source !== 'manual'}}" class="find" bindtap="aboutCompany">{{abouting ? 'AI 正在联网搜索，约 10–30 秒…' : (info.intro ? 'AI 联网补充了解这家公司' : 'AI 联网了解这家公司')}}</view>
+    <view wx:if="{{aboutMsg}}" class="findmsg">{{aboutMsg}}</view>
+  </view>
+
+  <view class="match-entry" bindtap="goMatch"><view class="match-entry-title">岗位证据与JD匹配 ›</view><view class="muted small">逐项核对届次、学历、城市、截止和原文，再对照你的经历。</view></view>
+  <view class="card facts">
+    <view class="fact-group">招聘信息</view>
+    <view class="row"><text class="k">网申开始</text><text class="v mono">{{openText}}</text></view>
+    <view class="row"><text class="k">{{c.publicOnly ? '招聘会时间' : '网申截止'}}</text><text class="v mono">{{deadlineText}}</text></view>
+    <view class="row"><text class="k">{{c.publicOnly ? '招聘会状态' : '招聘状态'}}</text><text class="v">{{c.publicOnly ? publicPhase : phaseText}}</text></view>
+    <view class="muted small" wx:if="{{c.manualReview}}">以下为原收录信息；复核结论不代表每个岗位均已确认开放，请逐岗核对原公告。</view>
+    <view class="row" wx:if="{{dlChange}}"><text class="k"></text><text class="v dlc">{{dlChange}}</text></view>
+    <view class="row" wx:if="{{dl.lines.length || dl.conflict}}"><text class="k">截止核对</text>
+      <view class="v">
+        <view class="dlwarn" wx:if="{{dl.conflict}}">各来源的截止日期不一致，可能是不同批次、不同岗位截止时间不同{{dl.earliest ? '，最早 ' + dl.earliestText + ' 就截止' : ''}}。以官方公告为准，想投的岗位尽量按最早的时间投。</view>
+        <view class="vnote"><view wx:for="{{dl.lines}}" wx:key="*this">{{item}}</view></view>
+      </view>
+    </view>
+    <view class="row" wx:if="{{c.cities}}"><text class="k">工作地点</text><text class="v">{{c.cities}}</text></view>
+    <view class="row" wx:if="{{eduReq || eduUnknown}}"><text class="k">学历要求</text>
+      <view class="v"><text wx:if="{{eduReq}}" class="exh">{{eduReq}}及以上</text><text wx:else class="muted">公告里没写，投递前看官方要求</text><view class="vnote" wx:if="{{eduText}}">{{eduText}}</view></view></view>
+    <view class="row" wx:if="{{c.source === 'manual' && c.note}}"><text class="k">说明</text><text class="v">{{c.note}}</text></view>
+    <view class="row" wx:elif="{{jobs.length || c.note}}">
+      <text class="k">{{c.manualReview ? (c.manualReview.status === 'expired' ? '历史收录岗位' : '收录岗位（未逐岗核验）') : '在招岗位'}}</text>
+      <view class="v">
+        <block wx:if="{{jobs.length}}">
+          <view class="jsum">共 {{jobs.length}} 个<text wx:for="{{jobGroups}}" wx:key="name"> · {{item.name}} {{item.items.length}}</text></view>
+          <view wx:if="{{!jobsOpen}}" class="jchips">
+            <text wx:for="{{jobsPreview}}" wx:key="*this" class="jc" data-job="{{item}}" bindtap="addTrackFromJob">{{item}}</text>
+          </view>
+          <block wx:else>
+            <view wx:for="{{jobGroups}}" wx:for-item="g" wx:key="name" class="jg">
+              <view class="jgt">{{g.name}}<text class="jgn">{{g.items.length}}</text></view>
+              <view class="jchips"><text wx:for="{{g.items}}" wx:key="*this" class="jc" data-job="{{item}}" bindtap="addTrackFromJob">{{item}}</text></view>
+            </view>
+          </block>
+          <view class="jmore" wx:if="{{jobs.length > jobsPreview.length || jobGroups.length > 1}}" bindtap="toggleJobs">{{jobsOpen ? '收起 ▴' : '按类别展开全部 ▾'}}</view>
+          <view class="jnote">点一个岗位，生成你的岗位卡</view>
+          <view class="jnote" wx:if="{{!jobsFull}}">来源网站只列出了部分岗位，完整岗位以官方公告为准</view>
+        </block>
+        <text wx:else>{{c.note}}</text>
+        <view class="jnote" wx:if="{{jobsLoading}}">正在获取完整岗位列表…</view>
+      </view>
+    </view>
+    <view class="fact-group verify-group">核实与来源</view>
+    <view class="row">
+      <text class="k">信息核实</text>
+      <view class="v"><text class="vb {{badge.cls}}" wx:if="{{badge}}">{{badge.text}}</text><view class="vnote" wx:if="{{vText}}">{{vText}}</view></view>
+    </view>
+    <view class="row" wx:if="{{vv}}"><text class="k">招聘核实</text><view class="v"><text class="vf {{vv.cls}}">{{vv.text}}</text><view class="vnote" wx:if="{{vv.reason}}">{{vv.reason}}</view></view></view>
+    <view class="row">
+      <text class="k">笔试情况</text>
+      <view class="v">
+        <block wx:if="{{ex}}"><text class="exh">{{ex.head}}</text><text class="aitag" wx:if="{{ex.by === 'ai'}}">AI 查到 · 仅供参考</text><view class="vnote" wx:if="{{ex.note}}">{{ex.note}}</view></block>
+        <block wx:else><text class="muted">暂无</text></block>
+        <view wx:if="{{(!ex || ex.head === '暂未查到') && webSearch}}" class="find" bindtap="findExam">{{examing ? '正在联网查…' : 'AI 查笔试信息'}}</view>
+        <view wx:if="{{examMsg}}" class="findmsg">{{examMsg}}</view>
+      </view>
+    </view>
+    <view class="row"><text class="k">信息来源</text><text class="v src">{{srcText}}</text></view>
+    <view class="row" wx:if="{{reportText}}"><text class="k">同学反馈</text><view class="v"><view class="dlwarn">{{reportText}}（近 30 天）。后台会重新核对，投递前先到官方渠道确认。</view></view></view>
+    <view class="row" wx:if="{{changeLog.length}}"><text class="k">变更记录</text>
+      <view class="v"><view class="logt" bindtap="toggleLog">{{logOpen ? '收起 ▴' : changeLog[0].at + ' ' + changeLog[0].what + '  ▾'}}</view>
+        <block wx:if="{{logOpen}}"><view wx:for="{{changeLog}}" wx:key="index" class="logi"><text class="logd">{{item.at}}</text>{{item.what}}</view></block></view></view>
+    <view class="rplink" bindtap="openReport">信息有误？告诉我们 ›</view>
+  </view>
+
+
+<view class="card" wx:if="{{c.publicJobs && c.publicJobs.length}}">
+  <view class="ab-h">人社公开岗位</view>
+  <view class="muted small">招聘会：{{c.publicSource.fairDate || '未注明'}} · 岗位截止以原公告为准</view>
+  <view class="row" wx:for="{{c.publicJobs}}" wx:key="title">
+    <view><view>{{item.title}} · {{item.typeLabel}}</view><view class="muted small" selectable>{{item.qualifications}}</view><view class="muted small">{{item.salary}}</view></view>
+  </view>
+  <view class="muted small" selectable>{{c.publicSource.url}}</view>
+</view>
+
+  <view wx:if="{{siblings.length}}">
+    <view class="sect-title">{{groupName}}旗下还在招（{{siblings.length}}）</view>
+
+  <view class="card sibs">
+      <view wx:for="{{siblings}}" wx:key="id" class="sib" data-id="{{item.id}}" bindtap="openSibling">
+        <text class="sn">{{item.company}}</text><text class="sw">{{item.when}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="sect-title">投递入口</view>
+  <view class="card links">
+    <view class="hint" style="margin-top:0;margin-bottom:8rpx">投递前请以企业官网或官方公众号的公告为准，这里的链接和日期可能有延迟。</view>
+    <view wx:if="{{official}}" class="link official-link" data-url="{{official}}" bindtap="copy">
+      <view><text class="lk">官方渠道{{c.linkBy === 'ai' ? '（AI 找到）' : ''}}</text><text class="host">{{officialHost}}</text></view><text class="copy">复制链接</text>
+    </view>
+    <view wx:else class="warn">
+      <view>暂未找到官方投递链接</view>
+      <view wx:if="{{webSearch && !c.closed}}" class="find" bindtap="findOfficial">{{finding ? 'AI 正在联网搜索，约 10–30 秒…' : 'AI 联网找官网'}}</view>
+      <view wx:if="{{findMsg}}" class="findmsg">{{findMsg}}</view>
+    </view>
+    <view wx:if="{{orig}}" class="link" data-url="{{orig}}" bindtap="copy">
+      <view><text class="lk">公告原文 · {{origLabel}}</text><text class="host">{{origHost}}</text></view><text class="copy">复制链接</text>
+    </view>
+    <view wx:if="{{ncssUrl}}" class="link" data-url="{{ncssUrl}}" bindtap="copy">
+      <view><text class="lk">国家大学生就业服务平台职位页（教育部）</text><text class="host">24365.ncss.cn</text></view><text class="copy">复制链接</text>
+    </view>
+    <view wx:if="{{agg}}" class="link" data-url="{{agg}}" bindtap="copy">
+      <view><text class="lk">汇总站页面{{aggAds ? '（有第三方弹窗广告）' : ''}}</text><text class="host">{{aggHost}}</text></view><text class="copy">复制链接</text>
+    </view>
+    <view wx:if="{{c.source !== 'curated'}}" class="link" data-url="{{searchWords}}" data-kind="words" bindtap="copy">
+      <view><text class="lk">搜索官方招聘页</text><text class="host">{{searchWords}}</text></view><text class="copy">复制关键词</text>
+    </view>
+    <view wx:if="{{referral && !refEditing}}" class="link" data-url="{{referral}}" bindtap="copy">
+      <view><text class="lk">投递用的内推码 / 内推链接</text><text class="host">{{referral}}</text></view><text class="copy">复制</text>
+    </view>
+    <view wx:if="{{refEditing}}" class="refedit">
+      <input class="input" value="{{refDraft}}" maxlength="200" focus placeholder="师兄师姐或内推群给的内推码、内推链接" bindinput="onRefDraft" />
+      <view class="refops"><text class="rop" bindtap="cancelRef">取消</text><text class="rop pri" bindtap="saveRef">保存</text></view>
+    </view>
+    <view wx:else class="addref" bindtap="editRef">{{referral ? '修改内推码' : '＋ 记下投递这家要用的内推码'}}<text class="muted">（师兄师姐、内推群给的，只存在你自己这里）</text></view>
+    <view class="hint">小程序里不能直接打开外部网页，复制后粘贴到浏览器里打开。</view>
+  </view>
+
+  <block wx:if="{{talks.length}}">
+    <view class="sect-title">近期宣讲会 · 双选会（{{talks.length}}）</view>
+    <view class="card talkc">
+      <view wx:for="{{talks}}" wx:key="slug" class="tk">
+        <view class="tk-m"><text class="tk-w">{{item.when}}</text><text class="tk-p">{{item.place}}</text></view>
+        <view class="tk-o"><text class="copy" data-i="{{index}}" bindtap="addTalk">加日程</text><text class="copy" data-url="{{item.url}}" bindtap="copyTalk">详情</text></view>
+      </view>
+      <view class="hint">来自各高校公开的宣讲会信息，出发前以学校和企业通知为准。</view>
+    </view>
+  </block>
+
+  <view class="sect-title" id="progress">我的进度</view>
+  <view class="card">
+    <view class="curst">
+      <text class="label0">当前状态</text>
+      <text class="chip {{status ? 's-' + status : 'none'}}">{{statusLabel || '未标记'}}</text>
+      <text class="muted small">在底部栏修改，点一下就保存</text>
+    </view>
+    <view class="failnote" wx:if="{{(status === 'rejected' || status === 'dropped') && (failStage || lesson)}}" bindtap="openFail">
+      <text class="fk">{{status === 'rejected' ? '挂在' : '放弃'}}</text>{{failStage}}<text wx:if="{{lesson}}"> · {{lesson}}</text><text class="fe">修改</text>
+    </view>
+    <view class="field">
+      <text class="label">我的岗位卡 <text class="lh2">每个岗位单独记要求、截止、投的简历</text></text>
+      <view wx:for="{{tracks}}" wx:key="id" class="jcard" data-i="{{index}}" bindtap="editTrack">
+        <view class="jc-h"><text class="jc-n">{{item.name}}</text><text class="jc-d" wx:if="{{item.dept}}">{{item.dept}}</text>
+          <text class="chip s-{{item.status}}">{{item.statusLabel}}<text wx:if="{{item.failStage}}"> · {{item.failStage}}</text></text></view>
+        <view class="jc-m" wx:if="{{item.meta}}">{{item.meta}}<text class="jc-lv" wx:if="{{item.level !== 'job'}}">公司级信息</text></view>
+        <view class="jc-e {{item.ev.cls}}"><text class="jc-eb">{{item.ev.text}}</text>{{item.elig.reason}}</view>
+        <view class="jc-q" wx:if="{{item.elig.quote}}">原文：{{item.elig.quote}}</view>
+        <view class="jc-r" wx:if="{{item.resume}}">投的简历：{{item.resume}}</view>
+        <view class="jc-ev">{{item.evid}}<text wx:if="{{item.unknown}}"> · 仍未知：{{item.unknown}}</text></view>
+        <view class="jc-u" wx:if="{{item.url}}" data-url="{{item.url}}" catchtap="copyTrackUrl">复制岗位链接</view>
+      </view>
+      <view class="addtrk" bindtap="addTrack">＋ 添加岗位卡</view>
+    </view>
+    <view class="field">
+      <text class="label">投递日期</text>
+      <picker mode="date" value="{{appliedAt}}" bindchange="onDate"><view class="picker">{{appliedAt || '选择日期'}}</view></picker>
+    </view>
+    <view class="field">
+      <text class="label">我的备注</text>
+      <textarea class="textarea" value="{{note}}" maxlength="500" placeholder="投的岗位、HR 联系方式、面试感受…" bindinput="onNote" bindblur="saveNote" />
+    </view>
+    <view class="hint">日期和备注改完会自动保存，只有你自己能看到。</view>
+    <view class="remind" wx:if="{{canRemind && showDeadlineRemind}}" bindtap="remindDeadline">{{reminded.deadline ? '✓ 已设置截止提醒' : '⏰ 网申截止前一天提醒我'}}</view>
+  </view>
+
+  <view class="sect-title">面试准备</view>
+  <view class="card">
+    <view class="field"><text class="label">岗位（按岗位搜面经更准）</text>
+      <input class="input" value="{{prepRole}}" maxlength="40" placeholder="如：后端开发" bindinput="onPrepRole" /></view>
+    <view class="actions" wx:if="{{webSearch}}">
+      <button class="btn primary" bindtap="makePrep" disabled="{{prepping}}">{{prepping ? 'AI 正在搜面经整理，约 20–40 秒…' : (prep ? '重新整理面试题' : 'AI 整理面试题')}}</button>
+    </view>
+    <view class="hint" wx:if="{{prepMsg}}">{{prepMsg}}</view>
+    <view wx:if="{{prep}}" class="prep">
+      <view class="pf" wx:if="{{prep.flow}}"><text class="pk">流程</text>{{prep.flow}}</view>
+      <view class="pf" wx:if="{{prep.focus.length}}"><text class="pk">重点</text>
+        <text wx:for="{{prep.focus}}" wx:key="*this" class="fc">{{item}}</text></view>
+      <view wx:for="{{prep.groups}}" wx:for-item="g" wx:key="cat" class="pg">
+        <view class="pgt">{{g.cat}}</view>
+        <view wx:for="{{g.items}}" wx:key="q" class="pq">
+          <view class="qq">{{index + 1}}. {{item.q}}</view>
+          <view class="qt">思路：{{item.tip}}</view>
+        </view>
+      </view>
+      <view class="muted small">{{prep.source || '整理自网上面经'}} · AI 整理，仅供参考</view>
+      <view class="ops2"><text class="op2" bindtap="copyPrep">复制全部</text></view>
+    </view>
+    <view class="linkrow" bindtap="goMaterials">📝 用网申材料库，按这家公司改写自我介绍等回答 ›</view>
+  </view>
+
+  <view class="sect-title">笔试 / 面试日程</view>
+  <view class="card">
+    <view class="evlist" wx:if="{{events.length}}">
+      <view wx:for="{{events}}" wx:key="at" class="ev {{item.past ? 'past' : ''}}">
+        <view class="evmain">
+          <text class="evtype">{{item.type}}</text>
+          <text class="evtime">{{item.label}}</text>
+          <text class="evtrk" wx:if="{{item.track}}">{{item.track}}</text>
+          <view class="evnote" wx:if="{{item.note}}">{{item.note}}</view>
+        </view>
+        <text class="evcal" wx:if="{{!item.past}}" data-i="{{index}}" bindtap="calEvent">📅 日历</text>
+        <text class="evbell" wx:if="{{canRemind && !item.past}}" data-i="{{index}}" bindtap="remindEvent">{{reminded[item.at] ? '✓已提醒' : '⏰提醒'}}</text>
+        <text class="evdel" data-i="{{index}}" bindtap="removeEvent">删除</text>
+      </view>
+    </view>
+    <view class="hint" wx:else>收到笔试、面试通知后记在这里，「我的投递」里会按时间排好。</view>
+    <view class="evform">
+      <picker range="{{eventTypes}}" value="{{evTypeIdx}}" bindchange="onEvType"><view class="picker sm">{{eventTypes[evTypeIdx]}}</view></picker>
+      <picker mode="date" value="{{evDate}}" bindchange="onEvDate"><view class="picker sm">{{evDate || '日期'}}</view></picker>
+      <picker mode="time" value="{{evTime}}" bindchange="onEvTime"><view class="picker sm">{{evTime || '时间'}}</view></picker>
+    </view>
+    <picker wx:if="{{tracks.length}}" range="{{trackNames}}" value="{{evTrackIdx}}" bindchange="onEvTrack"><view class="picker sm" style="margin-top:12rpx">属于：{{trackNames[evTrackIdx]}}</view></picker>
+    <input class="input" style="margin-top:12rpx" value="{{evNote}}" maxlength="30" placeholder="备注，如 线上 / 腾讯会议号 / 地点" bindinput="onEvNote" />
+    <view class="actions"><button class="btn" bindtap="addEvent">添加日程</button></view>
+  </view>
+
+  <view class="actions"><button class="btn" open-type="share">分享给同学</button></view>
+  <view class="hint center">同学需要是秋招雷达的体验成员才能打开</view>
+  <view class="actions" wx:if="{{isOwner}}">
+    <button class="btn" bindtap="edit">编辑公司信息</button>
+    <button class="btn danger" bindtap="remove">删除</button>
+  </view>
+  <view class="actions" wx:elif="{{c.source !== 'curated' && !c.closed}}">
+    <button class="btn" bindtap="hide">信息有问题，不再显示这家</button>
+  </view>
+
+  <view class="dock">
+    <view class="dmat" bindtap="openMats"><text class="dmi">📝</text><text>材料</text></view>
+    <view wx:for="{{quick}}" wx:key="k" class="dq {{status === item.k ? 'on' : ''}}" data-k="{{item.k}}" bindtap="quickPick">{{status === item.k ? '✓ ' : ''}}{{item.label}}</view>
+    <view class="dq more {{status && !quickKeys[status] ? 'on' : ''}}" bindtap="moreStatus">{{status && !quickKeys[status] ? '✓ ' + statusLabel : '更多'}}</view>
+  </view>
+
+  <view class="mask" wx:if="{{sheet}}" bindtap="closeSheet"></view>
+  <view class="sheet" wx:if="{{sheet === 'event'}}">
+    <view class="sh-t">{{status === 'test' ? '记下笔试 / 测评时间？' : '记下面试时间？'}}</view>
+    <view class="sh-s">会并入「我的投递」的待办，按时间排好，撞车时会提醒你。</view>
+    <view class="evform">
+      <picker range="{{eventTypes}}" value="{{evTypeIdx}}" bindchange="onEvType"><view class="picker sm">{{eventTypes[evTypeIdx]}}</view></picker>
+      <picker mode="date" value="{{evDate}}" bindchange="onEvDate"><view class="picker sm">{{evDate || '日期'}}</view></picker>
+      <picker mode="time" value="{{evTime}}" bindchange="onEvTime"><view class="picker sm">{{evTime || '时间'}}</view></picker>
+    </view>
+    <picker wx:if="{{tracks.length}}" range="{{trackNames}}" value="{{evTrackIdx}}" bindchange="onEvTrack"><view class="picker sm" style="margin-top:14rpx">属于：{{trackNames[evTrackIdx]}}</view></picker>
+    <input class="input" style="margin-top:14rpx" value="{{evNote}}" maxlength="30" placeholder="会议号 / 链接 / 地点" bindinput="onEvNote" />
+    <view class="calopt" bindtap="toggleCal"><text class="cbox {{calOn ? 'on' : ''}}">{{calOn ? '✓' : ''}}</text>同时加到手机日历（提前 15 分钟响铃）</view>
+    <view class="actions"><button class="btn" bindtap="closeSheet">以后再说</button><button class="btn primary" bindtap="addEventFromSheet">保存日程</button></view>
+  </view>
+  <view class="sheet" wx:if="{{sheet === 'fail'}}">
+    <view class="sh-t">{{status === 'rejected' ? '挂在哪一步了？' : '放弃这家'}}</view>
+    <view class="sh-s">记一下，下次同一家公司换批次、换部门再投时能看到。只有你自己能看到。</view>
+    <view class="stages" wx:if="{{status === 'rejected'}}"><text wx:for="{{failStages}}" wx:key="*this" class="qc {{failStage === item ? 'on' : ''}}" data-v="{{item}}" bindtap="pickStage">{{item}}</text></view>
+    <input class="input" style="margin-top:16rpx" value="{{lesson}}" maxlength="100" placeholder="{{status === 'rejected' ? '一句话复盘，如：手撕二叉树没写出来' : '放弃的原因，如：城市不合适'}}" bindinput="onLesson" />
+    <view class="calopt" bindtap="toggleHideAfter"><text class="cbox {{hideAfter ? 'on' : ''}}">{{hideAfter ? '✓' : ''}}</text>在招公司列表里不再显示这家</view>
+    <view class="actions"><button class="btn" bindtap="closeSheet">跳过</button><button class="btn primary" bindtap="saveFail">保存</button></view>
+  </view>
+  <view class="sheet big" wx:if="{{sheet === 'track'}}">
+    <view class="sh-t">{{td.idx >= 0 ? '修改岗位卡' : '添加岗位卡'}}</view>
+    <scroll-view scroll-y class="tdscroll">
+      <view class="jdbox">
+        <textarea class="textarea sm" value="{{td.jd}}" maxlength="8000" placeholder="粘贴这个岗位在官网上的职位描述（JD）或链接，AI 帮你识别岗位要求，并对照你的学历、专业判断能不能投" data-f="jd" bindinput="onTd" />
+        <button class="btn sm" bindtap="parseJd" disabled="{{td.parsing}}">{{td.parsing ? '识别中…' : 'AI 识别 JD'}}</button>
+        <view class="hint" wx:if="{{td.parseMsg}}">{{td.parseMsg}}</view>
+      </view>
+      <view class="jc-e {{td.elig.state === 'ok' ? 'ok' : td.elig.state === 'no' ? 'bad' : 'mid'}}"><text class="jc-eb">{{td.elig.state === 'ok' ? '确认可投' : td.elig.state === 'no' ? '明确不符合' : '要求未知'}}</text>{{td.elig.reason}}</view>
+      <view class="jc-q" wx:if="{{td.elig.quote}}">原文：{{td.elig.quote}}</view>
+      <view class="jc-lvtip" wx:if="{{td.level !== 'job'}}">下面的截止、城市、学历是公司级信息，不一定是这个岗位的；粘贴 JD 识别后会换成岗位自己的</view>
+      <input class="input" value="{{td.name}}" maxlength="30" placeholder="岗位名称" data-f="name" bindinput="onTd" />
+      <view class="two2">
+        <input class="input" value="{{td.dept}}" maxlength="30" placeholder="部门 / 事业群" data-f="dept" bindinput="onTd" />
+        <input class="input" value="{{td.batch}}" maxlength="20" placeholder="批次，如 提前批" data-f="batch" bindinput="onTd" />
+      </view>
+      <view class="two2">
+        <input class="input" value="{{td.city}}" maxlength="40" placeholder="工作城市" data-f="city" bindinput="onTd" />
+        <picker range="{{eduPick}}" bindchange="onTdEdu"><view class="picker">{{td.edu ? td.edu + '及以上' : '学历要求'}}</view></picker>
+      </view>
+      <input class="input" value="{{td.major}}" maxlength="60" placeholder="专业要求（原文）" data-f="major" bindinput="onTd" />
+      <view class="two2">
+        <picker mode="date" value="{{td.deadline}}" data-f="deadline" bindchange="onTdDate"><view class="picker">{{td.deadline ? '截止 ' + td.deadline : '这个岗位的截止日期'}}</view></picker>
+        <picker range="{{statuses}}" range-key="label" value="{{td.statusIdx}}" bindchange="onTdStatus"><view class="picker">{{statuses[td.statusIdx].label}}</view></picker>
+      </view>
+      <view class="stages" wx:if="{{statuses[td.statusIdx].k === 'rejected'}}"><text wx:for="{{failStages}}" wx:key="*this" class="qc {{td.failStage === item ? 'on' : ''}}" data-v="{{item}}" bindtap="pickTdStage">{{item}}</text></view>
+      <view class="two2">
+        <picker mode="date" value="{{td.appliedAt}}" data-f="appliedAt" bindchange="onTdDate"><view class="picker">{{td.appliedAt ? '投于 ' + td.appliedAt : '投递日期'}}</view></picker>
+        <input class="input" value="{{td.resume}}" maxlength="40" placeholder="投的简历版本，如 后端版v3" data-f="resume" bindinput="onTd" />
+      </view>
+      <input class="input" value="{{td.url}}" maxlength="300" placeholder="官方职位链接" data-f="url" bindinput="onTd" />
+      <textarea class="textarea sm" value="{{td.note}}" maxlength="200" placeholder="岗位要点、备注" data-f="note" bindinput="onTd" />
+    </scroll-view>
+    <view class="actions"><button class="btn" wx:if="{{td.idx >= 0}}" bindtap="removeTrack">删除</button><button class="btn" wx:else bindtap="closeSheet">取消</button><button class="btn primary" bindtap="saveTrack">保存</button></view>
+  </view>
+  <view class="sheet" wx:if="{{sheet === 'report'}}">
+    <view class="sh-t">信息有误？</view>
+    <view class="sh-s">选一下是哪类问题。反馈是匿名的，后台会重新读取来源公告核对；同一类问题有 2 位以上同学反馈时，会提醒其他人注意。</view>
+    <view class="stages"><text wx:for="{{reportTypes}}" wx:key="*this" class="qc {{rpType === item ? 'on' : ''}}" data-v="{{item}}" bindtap="pickRp">{{item}}</text></view>
+    <input class="input" style="margin-top:16rpx" value="{{rpNote}}" maxlength="80" placeholder="补充说明（选填），如 官网显示 10/15 截止" bindinput="onRpNote" />
+    <view class="actions"><button class="btn" bindtap="closeSheet">取消</button><button class="btn primary" bindtap="sendReport">提交</button></view>
+  </view>
+  <view class="sheet" wx:if="{{sheet === 'mat'}}">
+    <view class="sh-t">网申材料<text class="sh-link" bindtap="goMaterials">编辑 / 按这家改写 ›</text></view>
+    <view class="sh-s">填网申表时点「复制」，粘贴到对应的框里。<text class="sh-link" wx:if="{{mats.length > 1}}" bindtap="copyAllMats">全部复制成文本包</text></view>
+    <scroll-view scroll-y class="matlist" wx:if="{{mats.length}}">
+      <view wx:for="{{mats}}" wx:key="title" class="mat">
+        <view class="mm"><view class="mt">{{item.title}}</view><view class="mc">{{item.content}}</view></view>
+        <text class="copy" data-i="{{index}}" bindtap="copyMat">复制</text>
+      </view>
+    </scroll-view>
+    <view class="hint" wx:elif="{{matsLoaded}}">还没有材料。去材料库写好自我介绍、项目经历、获奖情况等常用回答，填网申时就能在这里一键复制。</view>
+    <view class="hint" wx:else>加载中…</view>
+  </view>
+</view>
+<view class="empty" wx:elif="{{error}}">{{error}}</view>
+<view class="empty" wx:else>加载中…</view>

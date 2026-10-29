@@ -1,0 +1,131 @@
+<view class="wrap compact-ai">
+  <view class="intro hero">
+    <view class="h">✨ 让 AI 帮你挑公司</view>
+    <view class="p">先按岗位、学历和城市找到值得看的机会，再用 AI 解释匹配理由。优先展示有岗位原文的结果。</view>
+    <view class="p warn" wx:if="{{!aiReady && loaded}}">还没有配置 AI 服务：按 README 在云函数 api 的环境变量里填好 AI 接口后才能用。</view>
+  </view>
+
+  <view class="plans">
+    <text class="pl-h">求职方案</text>
+    <view wx:for="{{plans}}" wx:key="id" class="pl {{curPlan === item.id ? 'on' : ''}}" data-id="{{item.id}}" bindtap="switchPlan" bindlongpress="planMenu">
+      {{item.name}}<text class="pl-n" wx:if="{{fresh[item.id].n}}">{{fresh[item.id].n}}</text>
+    </view>
+    <view class="pl add" bindtap="newPlan">＋ 新方案</view>
+  </view>
+  <view class="pl-tip" wx:if="{{plans.length > 1}}">点方案切换条件和结果，长按可重命名或删除；数字是最近两天和这个方案对得上的新机会</view>
+  <view class="freshbox" wx:if="{{fresh[curPlan].n}}">
+    <view class="fb-h" bindtap="toggleFresh">🆕 最近两天有 {{fresh[curPlan].n}} 家新机会和当前方案对得上 {{freshOpen ? '▴' : '▾'}}</view>
+    <block wx:if="{{freshOpen}}">
+      <view wx:for="{{fresh[curPlan].top}}" wx:key="id" class="fb-i" data-id="{{item.id}}" bindtap="openFresh">
+        <text class="fb-c">{{item.company}}</text><text class="fb-j">{{item.hit.length ? item.hit.join('、') : ''}}</text>
+      </view>
+      <view class="fb-more">重新点「开始匹配」可以把它们排进完整名单</view>
+    </block>
+  </view>
+
+  <view class="condition-summary" wx:if="{{result}}" bindtap="toggleConditions"><text>{{edus[eduIdx]}} · {{p.role || p.major || '当前方案'}}{{p.city ? ' · ' + p.city : ''}}</text><text class="condition-action">{{conditionsOpen ? '收起条件' : '修改条件'}} ▾</text></view>
+  <view class="card" wx:if="{{!result || conditionsOpen}}">
+    <view class="field">
+      <text class="label">最高学历 <text class="lh">单选，向下兼容：选硕士也会推荐本科起招的岗位</text></text>
+      <view class="qchips"><text wx:for="{{edus}}" wx:key="*this" class="qc {{eduIdx === index ? 'on' : ''}}" data-i="{{index}}" bindtap="tapEdu">{{eduIdx === index ? '✓ ' : ''}}{{item}}</text></view>
+    </view>
+    <view class="field">
+      <text class="label">专业 <text class="lh">单选，也可以自己输入</text></text>
+      <input class="input" value="{{p.major}}" data-f="major" bindinput="onText" placeholder="点下面的常见专业，或者自己输入" />
+      <scroll-view scroll-x class="quick-cats"><view wx:for="{{majorGroups}}" wx:key="k" class="quick-cat {{majorGroupIdx === index ? 'on' : ''}}" data-f="major" data-i="{{index}}" bindtap="onQuickGroup">{{item.t}}</view></scroll-view>
+      <view class="qchips"><text wx:for="{{quick.major}}" wx:key="v" class="qc {{item.on ? 'on' : ''}}" data-f="major" data-v="{{item.v}}" bindtap="tapQuick">{{item.on ? '✓ ' : ''}}{{item.v}}</text></view>
+    </view>
+    <view class="field">
+      <text class="label">想做的岗位方向 <text class="lh">可多选，建议 1–3 个</text></text>
+      <input class="input" value="{{p.role}}" data-f="role" bindinput="onText" placeholder="点下面的常见岗位，或者自己输入" />
+      <view class="quick-selected" wx:if="{{selectedRoleText}}">已选：{{selectedRoleText}}</view>
+      <scroll-view scroll-x class="quick-cats"><view wx:for="{{roleGroups}}" wx:key="k" class="quick-cat {{roleGroupIdx === index ? 'on' : ''}}" data-f="role" data-i="{{index}}" bindtap="onQuickGroup">{{item.t}}</view></scroll-view>
+      <view class="qchips"><text wx:for="{{quick.role}}" wx:key="v" class="qc {{item.on ? 'on' : ''}}" data-f="role" data-v="{{item.v}}" bindtap="tapQuick">{{item.on ? '✓ ' : ''}}{{item.v}}</text></view>
+    </view>
+    <view class="field">
+      <text class="label">意向城市 <text class="lh">可多选，不选表示不限</text></text>
+      <input class="input" value="{{p.city}}" data-f="city" bindinput="onText" placeholder="点下面的城市，或者自己输入" />
+      <view class="qchips"><text wx:for="{{quick.city}}" wx:key="v" class="qc {{item.on ? 'on' : ''}}" data-f="city" data-v="{{item.v}}" bindtap="tapQuick">{{item.on ? '✓ ' : ''}}{{item.v}}</text></view>
+    </view>
+    <view class="field">
+      <text class="label">偏好行业 <text class="lh">可多选，不选表示不限</text></text>
+      <view class="pickwrap">
+        <view wx:for="{{industries}}" wx:key="name" class="fchip {{item.on ? 'on' : ''}}" data-i="{{index}}" bindtap="toggleInd">{{item.on ? '✓ ' : ''}}{{item.name}}</view>
+      </view>
+    </view>
+    <view class="field">
+      <text class="label">偏好企业性质 <text class="lh">可多选，不选表示不限</text></text>
+      <view class="pickwrap">
+        <view wx:for="{{ctypes}}" wx:key="name" class="fchip {{item.on ? 'on' : ''}}" data-i="{{index}}" bindtap="toggleCtype">{{item.on ? '✓ ' : ''}}{{item.name}}</view>
+      </view>
+    </view>
+    <view class="calopt2" bindtap="toggleSingle"><text class="cbox2 {{withSingle ? 'on' : ''}}">{{withSingle ? '✓' : ''}}</text>也包括来源不明的公司<text class="lh">（只有一个汇总站收录、查不到出处，默认不含）</text></view>
+    <view class="field">
+      <text class="label">兴趣爱好（选填）</text>
+      <input class="input" value="{{p.hobby}}" data-f="hobby" bindinput="onText" maxlength="100" placeholder="如：打游戏、摄影、汽车、健身——AI 会给相关行业适当加分" />
+    </view>
+    <view class="field">
+      <text class="label">其他情况（选填） <text class="lh">只影响 AI 精评的前 120 家怎么打分</text></text>
+      <textarea class="textarea" value="{{p.more}}" maxlength="600" data-f="more" bindinput="onText" placeholder="如：会 Python/SQL；在运营商实习过网络运维；更看重成长；不考虑销售岗" />
+      <view class="tip">适合写技能、实习或项目经历、偏好哪类公司、明确不想做的岗位。AI 只看得到公司名、行业、城市、在招岗位和学历要求，<text style="font-weight:600">查不到薪资、双休、加班、企业文化</text>，写了也不会生效；写「不考虑××」只会让相关公司排到后面，不会删掉。城市、行业等硬条件请用上面的选项。</view>
+    </view>
+  </view>
+
+  <block wx:if="{{result}}">
+    <view class="sum">
+      <view wx:if="{{result.summary}}">{{result.summary}}</view>
+      <view class="small" wx:if="{{reviewing}}">AI 正在精评排名前 120 家（{{reviewDone}}/{{reviewTotal}} 批），评完的会自动重新排序…</view>
+      <view class="small muted" wx:if="{{verifying}}">正在联网核实排名前 5 家的招聘是否属实，还剩 {{verifying}} 家…</view>
+      <view class="small muted">在招 {{result.pool}} 家里有 {{result.matched}} 家和你相关<text wx:if="{{result.direct != null}}">，其中 {{result.direct}} 家岗位里直接有「{{result.roleWords[0] || '你想做的方向'}}」<text wx:if="{{result.proven != null}}">（{{result.proven}} 家有公告原文）</text></text><text wx:if="{{result.excluded}}">；已排除 {{result.excluded}} 家明确要求{{result.edu === '大专' ? '本科' : '更高学历'}}及以上的</text>，列出前 {{result.count}} 家 · {{resultTime}}</view>
+      <view class="rule-link" bindtap="toggleRule">{{showRule ? '收起' : '匹配分怎么算？'}}</view>
+      <view class="rule" wx:if="{{showRule}}">
+        <view>排序先分档：岗位里直接有你填的方向 → 只命中 AI 扩展的相近岗位 → 只是行业相关，档内再按分数排。规则分满分 100：岗位对口 40（命中你想做的岗位最高，AI 扩展的相关岗位、专业词次之）· 行业 15 · 城市 15（全国招算一半多）· 企业性质 10 · 可信度 10（有官方链接 / 多个来源收录更高）· 时间 10（离截止还远更高，快截止会标出来）。</view>
+        <view>AI 精评过的公司，综合分 = AI 评分 × 60% + 规则分 × 40%。AI 只看到公司名、行业、城市和在招岗位，投递前请以官方公告为准。</view>
+      </view>
+    </view>
+    <view class="bar">
+      <view wx:for="{{filters}}" wx:key="k" class="fchip {{filter === item.k ? 'on' : ''}}" data-k="{{item.k}}" bindtap="onFilter">{{item.t}}</view>
+    </view>
+    <view class="bar">
+      <view wx:for="{{sorts}}" wx:key="k" class="fchip sm {{sort === item.k ? 'on' : ''}}" data-k="{{item.k}}" bindtap="onSort">{{item.t}}</view>
+      <text class="muted small cnt">共 {{count}} 家</text>
+    </view>
+    <view class="list">
+      <block wx:for="{{items}}" wx:key="id">
+      <view class="sec" wx:if="{{item.sec}}">{{item.sec}}</view>
+      <view class="item {{item.closedCls}}">
+        <view class="main" hover-class="item-hover" data-id="{{item.id}}" bindtap="open">
+          <view class="name-row">
+            <text class="rank">{{item.rank}}</text>
+            <text class="name">{{item.company}}</text>
+            <text class="score {{item.scoreCls}}">{{item.score}}分</text>
+          </view>
+          <view class="proofline">
+            <text class="vb {{item.badge.cls}}" wx:if="{{item.badge && !item.vv}}">{{item.badge.text}}</text>
+            <text class="vf {{item.vv.cls}}" wx:if="{{item.vv}}">{{item.vv.text}}</text>
+          </view>
+          <view class="compact-role" wx:if="{{item.hit}}">{{item.hitLabel}}：{{item.hit}}</view>
+          <view class="compact-meta">{{item.compactMeta}}</view>
+          <view class="compact-meta">{{item.compactSource}}</view>
+          <view class="evidence-link" wx:if="{{!item.gone}}" data-id="{{item.id}}" data-role="{{item.roleName}}" catchtap="goEvidence">届次 / 学历 / 城市 / 截止 / 原文 · 查看证据与JD匹配 ›</view>
+        </view>
+        <view class="side">
+          <text class="cd {{item.cdCls}}">{{item.cdText}}</text>
+          <view wx:if="{{item.status === 'want'}}" class="want on" data-id="{{item.id}}" catchtap="want">✓ 想投</view>
+          <text wx:elif="{{item.status}}" class="chip s-{{item.status}}">{{item.statusLabel}}</text>
+          <view wx:elif="{{!item.gone}}" class="want" data-id="{{item.id}}" catchtap="want">想投</view>
+        </view>
+      </view>
+      </block>
+    </view>
+    <view class="more" wx:if="{{more}}" bindtap="showMore">{{loadingMore ? '加载中…' : '再显示 30 家'}}</view>
+    <view class="more muted" wx:elif="{{count}}">已经是全部了</view>
+    <view class="more muted" wx:else>这个筛选下还没有公司{{reviewing ? '，AI 还在评' : ''}}</view>
+  </block>
+
+  <view class="fixbar">
+    <view class="fixhint">匹配时会把求职条件发给智谱 AI；个人投递记录不会公开。</view>
+    <view class="fixhint" wx:if="{{status}}">{{status}}</view>
+    <button class="btn primary fixbtn" bindtap="run" disabled="{{busy}}">{{busy ? '正在挑选…' : result ? '按新条件重新挑选' : '✨ 开始匹配'}}</button>
+  </view>
+</view>

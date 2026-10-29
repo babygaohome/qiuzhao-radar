@@ -1,0 +1,60 @@
+<view class="wrap">
+  <view class="muted small intro">{{id ? '修改你添加的公司信息' : '录入你在别处看到的招聘，之后就能标记投递进度。只有你自己能看到。'}}</view>
+  <view class="card paste" wx:if="{{!id}}">
+    <view class="field">
+      <text class="label">粘贴招聘公告，AI 自动识别</text>
+      <textarea class="textarea" value="{{pasteText}}" maxlength="8000" placeholder="把公告正文或公众号文章链接粘贴到这里，AI 会自动填好下面的表格" bindinput="onPaste" />
+    </view>
+    <view class="actions"><button class="btn primary" bindtap="parse" disabled="{{parsing}}">{{parsing ? 'AI 正在识别，约 10–20 秒…' : 'AI 识别并填表'}}</button></view>
+    <view class="hint" wx:if="{{parseMsg}}">{{parseMsg}}</view>
+    <view class="exist" wx:if="{{existing}}" bindtap="openExisting">列表里已经有「{{existing.company}}」，点这里直接去看 ›</view>
+  </view>
+  <view class="card">
+    <view class="field">
+      <text class="label">公司名称</text>
+      <input class="input" value="{{f.company}}" data-f="company" bindinput="onText" placeholder="例如：米哈游" />
+    </view>
+    <view class="two">
+      <view class="field">
+        <text class="label">行业</text>
+        <picker range="{{industries}}" value="{{indIdx}}" bindchange="onInd"><view class="picker">{{industries[indIdx]}}</view></picker>
+      </view>
+      <view class="field">
+        <text class="label">企业性质</text>
+        <picker range="{{ctypes}}" value="{{ctypeIdx}}" bindchange="onCtype"><view class="picker">{{ctypes[ctypeIdx]}}</view></picker>
+      </view>
+    </view>
+    <view class="field">
+      <text class="label">批次</text>
+      <input class="input" value="{{f.batch}}" data-f="batch" bindinput="onText" placeholder="正式批 / 提前批" />
+    </view>
+    <view class="two">
+      <view class="field">
+        <text class="label">网申开始</text>
+        <picker mode="date" value="{{f.openDate}}" bindchange="onDate" data-f="openDate"><view class="picker">{{f.openDate || '选择日期'}}</view></picker>
+      </view>
+      <view class="field">
+        <text class="label">网申截止</text>
+        <picker mode="date" value="{{f.deadline}}" bindchange="onDate" data-f="deadline" disabled="{{f.rolling}}"><view class="picker {{f.rolling ? 'muted' : ''}}">{{f.rolling ? '招满即止' : (f.deadline || '选择日期')}}</view></picker>
+      </view>
+    </view>
+    <label class="check"><switch checked="{{f.rolling}}" bindchange="onRolling" color="#1F4FD1" style="transform:scale(.7)" />没有固定截止日期（招满即止）</label>
+    <view class="field">
+      <text class="label">工作城市</text>
+      <input class="input" value="{{f.cities}}" data-f="cities" bindinput="onText" placeholder="如：上海,杭州" />
+    </view>
+    <view class="field">
+      <text class="label">投递链接</text>
+      <input class="input" value="{{f.url}}" data-f="url" bindinput="onText" placeholder="jobs.example.com" />
+    </view>
+    <view class="field" wx:if="{{exam}}">
+      <text class="label">笔试情况（从公告识别）</text>
+      <view class="picker">{{exam.has === '有' ? '有笔试/测评' : exam.has === '无' ? '无笔试' : '未知'}}{{exam.note ? '：' + exam.note : ''}}</view>
+    </view>
+    <view class="field">
+      <text class="label">说明</text>
+      <input class="input" value="{{f.note}}" data-f="note" bindinput="onText" placeholder="重点岗位、笔试时间等" />
+    </view>
+    <view class="actions"><button class="btn primary" bindtap="save" disabled="{{saving}}">{{id ? '保存' : '添加'}}</button></view>
+  </view>
+</view>

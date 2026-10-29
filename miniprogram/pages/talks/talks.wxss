@@ -1,0 +1,16 @@
+.intro { font-size: 24rpx; color: var(--muted); background: var(--surface); border-radius: 24rpx; padding: 20rpx 26rpx; box-shadow: var(--shadow); border-left: 8rpx solid var(--violet); margin-bottom: 18rpx; line-height: 1.6; }
+.bar { display: flex; flex-wrap: wrap; gap: 12rpx; margin-bottom: 14rpx; }
+.bar .fchip { margin-right: 0; }
+.tchip { font-size: 24rpx; color: var(--muted); border: 1rpx dashed var(--off); border-radius: 999rpx; padding: 8rpx 22rpx; }
+.tchip.on { color: var(--accent); background: var(--accent-soft); border: 1rpx solid var(--accent); font-weight: 600; }
+.search { margin: 4rpx 0 6rpx; }
+.count { margin: 14rpx 8rpx; }
+.talk { gap: 22rpx; }
+.when { flex: none; width: 110rpx; display: flex; flex-direction: column; align-items: center; background: var(--accent-soft); border-radius: 18rpx; padding: 12rpx 0; height: fit-content; }
+.wd { font-family: var(--mono); font-weight: 700; font-size: 30rpx; color: var(--accent); }
+.ww { font-size: 21rpx; color: var(--muted); }
+.wt { font-family: var(--mono); font-size: 21rpx; color: var(--ink); margin-top: 4rpx; text-align: center; }
+.ttl { font-size: 24rpx; color: var(--muted); margin-top: 4rpx; }
+.place { font-size: 24rpx; margin-top: 6rpx; }
+.ops { display: flex; flex-wrap: wrap; gap: 20rpx; margin-top: 12rpx; }
+.op { font-size: 23rpx; color: var(--accent); font-weight: 600; }

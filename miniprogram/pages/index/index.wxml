@@ -1,0 +1,122 @@
+<view class="wrap compact-home">
+  <view class="hero">
+    <view class="brand"><text class="title">秋招雷达</text><text class="season">2027届</text></view>
+    <view class="sub" wx:if="{{metaText}}">{{metaText}}</view>
+    <view class="hstats">
+      <view class="hs"><text class="num">{{stats.open == null ? '–' : stats.open}}</text><text class="lab">在招公司</text></view>
+      <view class="hs"><text class="num">{{stats.applied == null ? '–' : stats.applied}}</text><text class="lab">我已投递</text></view>
+      <view class="hs"><text class="num">{{stats.flow == null ? '–' : stats.flow}}</text><text class="lab">笔试/面试</text></view>
+      <view class="hs"><text class="num">{{stats.offer == null ? '–' : stats.offer}}</text><text class="lab">Offer</text></view>
+    </view>
+  </view>
+
+  <view class="todo" wx:if="{{todo.length}}">
+    <view class="todo-h"><text class="todo-t">今日待办</text><text class="todo-n">{{todo.length + todoMore}} 件</text></view>
+    <view wx:for="{{todo}}" wx:key="index" class="todo-i" data-id="{{item.id}}" bindtap="open">
+      <text class="todo-k {{item.kind}}">{{item.kind === 'deadline' ? '截止' : item.kind === 'event' ? '日程' : '跟进'}}</text>
+      <view class="todo-b"><text class="todo-c">{{item.company}}</text><text class="todo-x">{{item.text}}</text></view>
+      <text class="todo-a">›</text>
+    </view>
+    <view wx:if="{{todoMore}}" class="todo-more" bindtap="goMine">还有 {{todoMore}} 件，去「我的投递」看全部 ›</view>
+  </view>
+
+  <view class="recent-panel">
+    <view class="recent-cell {{recentKind === 'new' ? 'active' : ''}}" data-kind="new" bindtap="showRecent">
+      <view class="recent-heading"><text class="recent-name">新收录公司</text><text class="recent-number">{{stats.recent ? stats.recent.new.total : '–'}}<text class="recent-unit">家</text></text></view>
+      <view class="recent-pending">其中待核实 {{stats.recent ? stats.recent.new.pending : '–'}} 家</view>
+    </view>
+    <view class="recent-cell {{recentKind === 'updated' ? 'active' : ''}}" data-kind="updated" bindtap="showRecent">
+      <view class="recent-heading"><text class="recent-name">已有公司更新</text><text class="recent-number">{{stats.recent ? stats.recent.updated.total : '–'}}<text class="recent-unit">家</text></text></view>
+      <view class="recent-pending">其中待核实 {{stats.recent ? stats.recent.updated.pending : '–'}} 家</view>
+    </view>
+  </view>
+  <view class="recent-foot">今天与昨天 · 北京时间 · 两类不重复计数</view>
+
+  <view class="qbars shortcuts">
+    <view class="qbar talk" bindtap="goTalks">
+      <view class="qi">会</view>
+      <view class="qt"><view class="qn2">宣讲 / 双选会</view></view>
+    </view>
+    <view class="qbar pick" wx:if="{{stats.pickup}}" bindtap="goPickup">
+      <view class="qi">荐</view>
+      <view class="qt"><view class="qn2">捡漏 {{stats.pickup}} 家</view></view>
+      <text class="qa">›</text>
+    </view>
+  </view>
+
+  <view class="vtabs">
+    <view class="vt {{tab === 'verified' ? 'on' : ''}}" data-k="verified" bindtap="onTab">✓ 已核实<text class="vn">{{stats.verified == null ? '—' : stats.verified}}</text></view>
+    <view class="vt {{tab === 'leads' ? 'on' : ''}}" data-k="leads" bindtap="onTab">待核实线索<text class="vn">{{stats.leads == null ? '—' : stats.leads}}</text></view>
+    <view class="vt {{tab === 'public' ? 'on' : ''}}" data-k="public" bindtap="onTab">其他公开招聘</view>
+  </view>
+
+  <view class="audit-warn" wx:if="{{stats.campaign && stats.campaign.audit && stats.campaign.audit.alarms.length}}">⚠ 今天的数据抽检发现部分「已核实」信息可能已经过期，正在排查；投递前请以企业官方公告为准</view>
+  <view class="camp" wx:if="{{filtersOpen && stats.campaign && (stats.campaign.orig || stats.campaign.search)}}">目录核查中 · 待核实线索 {{stats.leads}} 家</view>
+
+  <view class="search gap">
+    <text class="si">⌕</text>
+    <input class="sin" placeholder="搜索公司、行业、岗位、城市" value="{{q}}" bindinput="onSearch" bindconfirm="onSearchNow" confirm-type="search" />
+  </view>
+
+  <scroll-view class="chips gap" scroll-x enable-flex>
+    <view class="fchip {{industry === '' ? 'on' : ''}}" data-ind="" bindtap="onIndustry">全部</view>
+    <view wx:for="{{facets}}" wx:key="name" class="fchip {{industry === item.name ? 'on' : ''}}" data-ind="{{item.name}}" bindtap="onIndustry">{{item.name}}<text class="n">{{item.n}}</text></view>
+  </scroll-view>
+
+  <view class="filter-toggle" bindtap="toggleFilters">{{filtersOpen ? '收起筛选 ▴' : '更多筛选 ▾'}}<text wx:if="{{official || fresh || showClosed || scopeIdx || ctypeIdx || batchIdx}}"> · 已设置</text></view>
+  <view class="filters gap" wx:if="{{filtersOpen}}">
+    <picker range="{{scopes}}" value="{{scopeIdx}}" bindchange="onScope"><view class="fbtn">{{scopes[scopeIdx]}} ▾</view></picker>
+    <picker range="{{ctypes}}" value="{{ctypeIdx}}" bindchange="onCtype"><view class="fbtn">{{ctypes[ctypeIdx]}} ▾</view></picker>
+    <picker range="{{batches}}" value="{{batchIdx}}" bindchange="onBatch"><view class="fbtn">{{batches[batchIdx]}} ▾</view></picker>
+    <picker range="{{sorts}}" value="{{sortIdx}}" bindchange="onSort"><view class="fbtn">{{sorts[sortIdx]}} ▾</view></picker>
+  </view>
+  <view class="toggles" wx:if="{{filtersOpen}}">
+    <view class="tchip {{official ? 'on' : ''}}" bindtap="tgOfficial">{{official ? '✓ ' : ''}}有官方链接</view>
+    <view class="tchip {{fresh ? 'on' : ''}}" bindtap="tgFresh">{{fresh ? '✓ ' : ''}}最近更新</view>
+    <view class="tchip {{showClosed ? 'on' : ''}}" bindtap="tgClosed">{{showClosed ? '✓ ' : ''}}显示已截止（含往期批次）</view>
+  </view>
+
+  <view class="count muted small" wx:if="{{tab === 'public'}}">含社招、实习和招聘对象未明确的岗位；专科学历符合不代表接受应届生，投递前请核对原公告。</view>
+  <view class="result-head"><text class="result-title">{{tab === 'recent' ? (recentKind === 'new' ? '新收录公司' : '已有公司更新') : tab === 'public' ? '其他公开招聘' : tab === 'leads' ? '待核实线索' : '在招机会'}}</text><text class="result-count" wx:if="{{total != null}}">共 {{total}} 家</text></view>
+  <view class="count muted small" wx:if="{{tab === 'recent'}}">包含已核实与待核实公司，可信度仍按每张卡片的标记区分。只看已核实可切换上方标签。</view>
+  <view class="count muted small" wx:if="{{total != null && (q || tab === 'leads')}}">{{q ? '搜索结果包含已核实与待核实线索' : '来源尚未核对到企业原始出处，投递前请再确认'}}</view>
+
+  <view class="list" wx:if="{{items.length}}">
+    <view wx:for="{{items}}" wx:key="id" class="item {{item.closedCls}}" hover-class="item-hover" data-id="{{item.id}}" bindtap="open">
+      <view class="main">
+        <view class="name-row">
+          <text class="newb" wx:if="{{item.reopened}}">新批次</text>
+          <text class="newb" wx:elif="{{item.isNew}}">新</text>
+          <text class="name">{{item.company}}</text>
+          <text class="ind">{{item.industry}}</text>
+        </view>
+        <view class="company-meta">
+          <text class="ctype" wx:if="{{item.ctype}}">{{item.ctype}}</text>
+          <text class="ctype" wx:if="{{item.scale}}">· {{item.scale}}</text>
+          <text class="vb {{item.badge.cls}}" wx:if="{{item.badge}}">{{item.badge.text}}</text>
+          <text class="btype" wx:if="{{item.btText}}">{{item.btText}}</text>
+          <text class="tag" wx:for="{{item.tags}}" wx:for-item="t" wx:key="*this">{{t}}</text>
+          <text class="grp" wx:if="{{item.group}}">{{item.group}}旗下</text>
+        </view>
+        <view class="note" wx:if="{{item.note}}">{{item.note}}</view>
+        <view class="dates">{{item.datesText}}</view>
+        <view class="dlc" wx:if="{{item.dlChange}}">{{item.dlChange}}</view>
+        <view class="dlc" wx:if="{{item.dlEarly}}">⚠ 各来源截止日期有出入，最早 {{item.dlEarly}} 就截止，点开看详情</view>
+      </view>
+      <view class="side">
+        <text class="cd {{item.cdCls}}">{{item.cdText}}</text>
+        <text class="chip {{item.status ? 's-' + item.status : 'none'}}">{{item.statusLabel}}</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="empty" wx:if="{{!items.length && !loading && !error}}">没有符合条件的公司</view>
+  <view class="empty" wx:if="{{error && !items.length}}">{{error}}<view class="retry" bindtap="reload">点这里重试</view></view>
+  <view class="count muted small" wx:if="{{error && items.length}}">刷新失败，仍显示上次结果：{{error}}<text class="retry" bindtap="reload">重试</text></view>
+  <view class="count muted small" wx:if="{{refreshing && items.length}}">正在更新列表…</view>
+  <view class="empty" wx:if="{{loading && !items.length}}">加载中…</view>
+  <view class="empty small" wx:if="{{done && items.length}}">到底了</view>
+  <view class="foot">信息汇总自公开渠道，网申时间与入口以企业官方为准</view>
+</view>
+
+<view class="fab" bindtap="add">+ 添加公司</view>

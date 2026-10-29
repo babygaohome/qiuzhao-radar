@@ -1,0 +1,5 @@
+{
+  "navigationBarTitleText": "秋招雷达",
+  "enablePullDownRefresh": true,
+  "onReachBottomDistance": 200
+}

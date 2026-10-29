@@ -1,0 +1,37 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/mine/mine",
+    "pages/ai/ai",
+    "pages/detail/detail",
+    "pages/edit/edit",
+    "pages/materials/materials",
+    "pages/offers/offers",
+    "pages/pickup/pickup",
+    "pages/talks/talks",
+    "pages/match/match"
+  ],
+  "window": {
+    "navigationBarTitleText": "秋招雷达",
+    "navigationBarBackgroundColor": "@navBg",
+    "navigationBarTextStyle": "@navText",
+    "backgroundColor": "@bg",
+    "backgroundTextStyle": "@bgText"
+  },
+  "tabBar": {
+    "color": "@tabColor",
+    "selectedColor": "@tabSelected",
+    "backgroundColor": "@tabBg",
+    "borderStyle": "@tabBorder",
+    "list": [
+      { "pagePath": "pages/index/index", "iconPath": "@icHome", "selectedIconPath": "@icHomeOn", "text": "在招公司" },
+      { "pagePath": "pages/mine/mine", "iconPath": "@icMine", "selectedIconPath": "@icMineOn", "text": "我的投递" },
+      { "pagePath": "pages/ai/ai", "iconPath": "@icAi", "selectedIconPath": "@icAiOn", "text": "AI 挑选" }
+    ]
+  },
+  "darkmode": true,
+  "themeLocation": "theme.json",
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

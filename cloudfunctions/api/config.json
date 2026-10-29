@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "openapi": []
+  },
+  "timeout": 60,
+  "triggers": [
+    {
+      "name": "maintain",
+      "type": "timer",
+      "config": "0 */10 * * * * *"
+    }
+  ]
+}

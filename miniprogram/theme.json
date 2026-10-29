@@ -1,0 +1,16 @@
+{
+  "light": {
+    "navBg": "#F5F7FB", "navText": "black", "bg": "#F5F7FB", "bgText": "dark",
+    "tabColor": "#8190A7", "tabSelected": "#3156D3", "tabBg": "#FFFFFF", "tabBorder": "white",
+    "icHome": "images/tab-home.png", "icHomeOn": "images/tab-home-on.png",
+    "icMine": "images/tab-mine.png", "icMineOn": "images/tab-mine-on.png",
+    "icAi": "images/tab-ai.png", "icAiOn": "images/tab-ai-on.png"
+  },
+  "dark": {
+    "navBg": "#0D1421", "navText": "white", "bg": "#0D1421", "bgText": "light",
+    "tabColor": "#8290A3", "tabSelected": "#8AA9FF", "tabBg": "#162133", "tabBorder": "black",
+    "icHome": "images/tab-home-d.png", "icHomeOn": "images/tab-home-d-on.png",
+    "icMine": "images/tab-mine-d.png", "icMineOn": "images/tab-mine-d-on.png",
+    "icAi": "images/tab-ai-d.png", "icAiOn": "images/tab-ai-d-on.png"
+  }
+}

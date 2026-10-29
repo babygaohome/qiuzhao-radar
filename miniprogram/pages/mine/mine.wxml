@@ -1,0 +1,152 @@
+<view class="wrap">
+  <view class="entries">
+    <view class="entry" bindtap="goMaterials"><view class="eic e1">材</view><text>网申材料</text></view>
+    <view class="entry" bindtap="goOffers"><view class="eic e2">比</view><text>Offer 对比</text></view>
+    <view class="entry" bindtap="toggleExport"><view class="eic e3">数</view><text>我的数据</text></view>
+    <view class="entry" bindtap="goPickup"><view class="eic e4">新</view><text>捡漏机会</text></view>
+  </view>
+  <view class="exportbox" wx:if="{{exportOpen}}">
+    <view class="data-h">我的数据</view>
+    <view class="small muted">把「我的投递」导出成表格：公司、状态、投递日期、截止、城市、岗位、下一个日程、投递链接、备注。</view>
+    <view class="ebtns">
+      <button class="btn primary sm" bindtap="exportFile">发送 Excel 文件到微信</button>
+      <button class="btn sm" bindtap="copyTable">复制为表格</button>
+    </view>
+    <view class="small muted">文件可以发给「文件传输助手」，在电脑上用 Excel / WPS 打开；复制的内容粘贴到 Excel、飞书表格会自动分列。</view>
+    <view class="bk-h">备份与恢复</view>
+    <view class="small muted">把投递记录、岗位卡、日程、材料、Offer 全部导出成一个备份文件，换微信号或误删后可以恢复。</view>
+    <view class="ebtns">
+      <button class="btn sm" bindtap="exportBackup">导出备份文件</button>
+      <button class="btn sm" bindtap="importBackup">从聊天文件恢复</button>
+    </view>
+    <view class="bk-alt" bindtap="importFromClipboard">备份内容在剪贴板里？点这里恢复 ›</view>
+    <view class="small muted" wx:if="{{importProgress}}">{{importProgress}}</view>
+    <view class="bk-h">管理和删除</view>
+    <view class="small muted privacy-note">你的投递记录、材料、Offer、AI 偏好只存在你自己的账号下，别人看不到。用 AI 润色、改写、识别 JD 或公告、AI 挑选时，相关文字会发给 AI 服务商（智谱）处理；联网核实时只把公司名等搜索词发给百度搜索。</view>
+    <view class="ebtns">
+      <button class="btn sm" bindtap="clearAi">清除 AI 偏好</button>
+      <button class="btn sm danger" bindtap="deleteAll">删除我的全部数据</button>
+    </view>
+  </view>
+  <view class="stats">
+    <view class="stat {{st === 'all' ? 'active' : ''}}" hover-class="stat-hover" data-k="all" bindtap="tapStat"><text class="num">{{counts.all}}</text><text class="lab">已标记 ›</text></view>
+    <view class="stat {{st === 'appliedGroup' ? 'active' : ''}}" hover-class="stat-hover" data-k="appliedGroup" bindtap="tapStat"><text class="num">{{counts.applied}}</text><text class="lab">已投递 ›</text></view>
+    <view class="stat {{st === 'flowGroup' ? 'active' : ''}}" hover-class="stat-hover" data-k="flowGroup" bindtap="tapStat"><text class="num">{{counts.flow}}</text><text class="lab">笔试/面试 ›</text></view>
+    <view class="stat offer {{st === 'offer' ? 'active' : ''}}" hover-class="stat-hover" data-k="offer" bindtap="tapStat"><text class="num">{{counts.offer}}</text><text class="lab">Offer ›</text></view>
+  </view>
+
+  <view class="newsbox" wx:if="{{news.length}}">
+    <view class="nh"><text>关注的公司有 {{news.length}} 条新动态</text><text class="nall" data-key="" bindtap="ackNews">全部知道了</text></view>
+    <view wx:for="{{news}}" wx:key="key" class="nw">
+      <view class="nm2" data-id="{{item.id}}" bindtap="open"><text class="nc">{{item.company}}</text><text class="nt {{item.cls}}">{{item.text}}</text></view>
+      <text class="nok" data-key="{{item.key}}" catchtap="ackNews">知道了</text>
+    </view>
+  </view>
+
+
+
+  <view class="statcard" wx:if="{{stats && stats.n}}">
+    <view class="sh" bindtap="toggleStats"><text>投递统计</text><text class="muted small">{{statsOpen ? '收起 ▴' : '展开 ▾'}}</text></view>
+    <block wx:if="{{statsOpen}}">
+      <view class="sub">投递漏斗（共 {{stats.n}} 家，未通过 {{stats.rejected}} 家）</view>
+      <view wx:for="{{stats.funnel}}" wx:key="label" class="bar">
+        <text class="bl">{{item.label}}</text>
+        <view class="bt"><view class="bf" style="width:{{item.w}}%"></view></view>
+        <text class="bn">{{item.n}}<text class="muted" wx:if="{{item.rate}}"> · {{item.rate}}</text></text>
+      </view>
+      <view class="sub">投递行业分布</view>
+      <view wx:for="{{stats.inds}}" wx:key="name" class="bar">
+        <text class="bl">{{item.name}}</text>
+        <view class="bt"><view class="bf ind" style="width:{{item.w}}%"></view></view>
+        <text class="bn">{{item.n}}</text>
+      </view>
+      <block wx:if="{{stats.fails.length}}">
+        <view class="sub">复盘：挂在哪一步</view>
+        <view wx:for="{{stats.fails}}" wx:key="name" class="bar">
+          <text class="bl">{{item.name}}</text>
+          <view class="bt"><view class="bf fail" style="width:{{item.w}}%"></view></view>
+          <text class="bn">{{item.n}}</text>
+        </view>
+      </block>
+      <view class="sub">最近 6 周每周投递数</view>
+      <view class="weeks">
+        <view wx:for="{{stats.weeks}}" wx:key="label" class="wk">
+          <text class="wn">{{item.n || ''}}</text>
+          <view class="wcol"><view class="wf" style="height:{{item.h}}%"></view></view>
+          <text class="wl">{{item.label}}</text>
+        </view>
+      </view>
+    </block>
+  </view>
+
+  <view class="todo" wx:if="{{todo.length}}">
+    <view class="th">待办 · 截止和笔试面试</view>
+    <view wx:for="{{todo}}" wx:for-item="day" wx:key="date" class="tday {{day.warn ? 'warnday' : ''}}">
+      <view class="tdh"><text class="tdn {{day.hot ? 'hot' : ''}}">{{day.head}}</text><text class="tds">{{day.sub}}</text><text class="tdw" wx:if="{{day.warn}}">⚠️ {{day.warn}}</text></view>
+      <view wx:for="{{day.items}}" wx:key="key" class="ti {{item.clash ? 'clash' : ''}}" data-id="{{item.id}}" bindtap="open">
+        <text class="tt {{item.kind}}">{{item.kind === 'dl' ? '截止' : (item.time || '全天')}}</text>
+        <view class="tm"><text class="tw {{item.kind}}">{{item.what}}</text>{{item.company}}<text class="tn" wx:if="{{item.note}}"> · {{item.note}}</text></view>
+        <text class="tc" wx:if="{{item.clash}}" data-company="{{item.company}}" data-what="{{item.what}}" data-date="{{item.date}}" data-time="{{item.time}}" catchtap="openClash">撞车 · 改期话术</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="list-anchor"></view>
+  <view class="view-hint" wx:if="{{st === 'appliedGroup' || st === 'flowGroup'}}">正在查看：{{viewLabel}} · {{shown.length}} 家 <text bindtap="resetFilter">查看全部 ›</text></view>
+  <scroll-view class="chips gap" scroll-x enable-flex wx:if="{{filters.length > 1}}">
+    <view wx:for="{{filters}}" wx:key="k" class="fchip {{st === item.k ? 'on' : ''}}" data-k="{{item.k}}" bindtap="onFilter">{{item.label}}<text class="n" wx:if="{{item.n}}">{{item.n}}</text></view>
+  </scroll-view>
+
+  <view class="list gap" wx:if="{{shown.length}}">
+    <view wx:for="{{shown}}" wx:key="id" class="item {{item.closedCls}}" hover-class="item-hover" data-id="{{item.id}}" bindtap="open">
+      <view class="main">
+        <view class="name-row"><text class="name">{{item.company}}</text><text class="ind">{{item.industry}}</text>
+          <text class="vf {{item.vv.cls}}" wx:if="{{item.vv && item.vv.cls === 'bad'}}">存疑</text></view>
+        <view class="dates">{{item.datesText}}</view>
+        <view class="dlc" wx:if="{{item.dlChange}}">{{item.dlChange}}</view>
+        <view class="dlc bad" wx:if="{{item.vv && item.vv.cls === 'bad'}}">核实：{{item.vv.reason}}</view>
+        <view class="failtxt" wx:if="{{item.failText}}">{{item.failText}}</view>
+        <view class="trktxt" wx:if="{{item.trackText}}">{{item.trackText}}</view>
+        <view class="mynote" wx:if="{{item.myNote}}">{{item.myNote}}</view>
+      </view>
+      <view class="side">
+        <text class="cd {{item.cdCls}}">{{item.cdText}}</text>
+        <text class="chip s-{{item.status}}">{{item.statusLabel}}</text>
+      </view>
+    </view>
+  </view>
+  <view class="empty filtered-empty" wx:if="{{loaded && !error && items.length && !shown.length}}">{{viewLabel}}里还没有公司，点上方「已标记」查看全部。</view>
+
+  <view class="emptybox" wx:if="{{loaded && !error && !items.length}}">
+    <view class="eh">还没有标记任何公司</view>
+    <view class="es">把感兴趣的公司标成「想投」，这里会帮你盯截止时间、记录投递进度和笔试面试日程。</view>
+    <view class="steps">
+      <view class="stp"><text class="sn">1</text>挑公司</view><text class="sa">›</text>
+      <view class="stp"><text class="sn">2</text>标「想投」</view><text class="sa">›</text>
+      <view class="stp"><text class="sn">3</text>投完改状态</view>
+    </view>
+    <button class="btn primary" bindtap="goAI">✨ 让 AI 帮我挑公司</button>
+    <view class="ebtn2">
+      <view class="lnk" bindtap="goList">去在招公司里找 ›</view>
+      <view class="lnk" bindtap="goPickup">看看捡漏机会 ›</view>
+    </view>
+  </view>
+  <view class="empty" wx:if="{{error}}">{{error}}</view>
+  <view class="empty" wx:if="{{!loaded && !error}}">加载中…</view>
+
+  <view class="mask" wx:if="{{backupDialog}}" bindtap="closeBackupDialog"></view>
+  <view class="sheet" wx:if="{{backupDialog}}">
+    <view class="sh-t">{{backupDialog === 'export' ? '设置备份密码' : '输入备份密码'}}</view>
+    <view class="sh-s">{{backupDialog === 'export' ? '加密文件可保护你的投递、材料和 Offer。请记好密码，忘记后无法恢复。' : '输入导出时设置的密码；密码错误或文件损坏时不会恢复数据。'}}</view>
+    <input class="input" password maxlength="128" value="{{backupPassword}}" bindinput="onBackupPassword" placeholder="至少8个字符" />
+    <view class="actions"><button class="btn" disabled="{{backupBusy}}" bindtap="closeBackupDialog">取消</button><button class="btn primary" disabled="{{backupBusy}}" bindtap="submitBackupPassword">{{backupBusy ? '处理中…' : backupDialog === 'export' ? '生成加密备份' : '解密并检查'}}</button></view>
+  </view>
+
+  <view class="mask" wx:if="{{clash}}" bindtap="closeClash"></view>
+  <view class="sheet" wx:if="{{clash}}">
+    <view class="sh-t">和 HR 沟通改期</view>
+    <view class="sh-s">{{clash.company}} 的{{clash.what}}（{{clash.when}}）和别的安排撞车了。复制下面的话术，把【】里的内容换成自己的，发邮件或回复通知短信。越早沟通越好。</view>
+    <scroll-view scroll-y class="cltext"><text user-select>{{clash.text}}</text></scroll-view>
+    <view class="actions"><button class="btn" bindtap="closeClash">关闭</button><button class="btn primary" bindtap="copyClash">复制话术</button></view>
+  </view>
+</view>

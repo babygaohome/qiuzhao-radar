@@ -1,0 +1,42 @@
+<view class="wrap">
+  <view class="head"><view class="mh">{{company || '岗位证据'}}</view><view class="muted small">{{role || '先粘贴具体岗位的JD'}} · 证据与个人匹配仅供你自己查看</view></view>
+  <view class="empty" wx:if="{{loading}}">加载中…</view>
+  <block wx:if="{{evidence}}">
+    <view class="card evidence">
+      <view class="section">现有证据 · 公司级</view>
+      <view class="e-row" wx:for="{{evidence.fields}}" wx:key="key"><text class="e-label">{{item.label}}</text><text class="e-value">{{item.value}}</text><text class="scope">{{item.scope === 'company' ? '公司信息' : '待核实'}}</text></view>
+      <view class="hint">{{evidence.note}}</view>
+      <view class="source" wx:if="{{evidence.url}}" data-url="{{evidence.url}}" bindtap="copySource">复制现有来源 · {{evidence.source}} ›</view>
+      <view class="hint" wx:if="{{recommendation}}">原推荐理由（公司级）：{{recommendation}}</view>
+    </view>
+    <view class="card form">
+      <view class="section">JD 与个人材料匹配</view>
+      <view class="field"><text class="label">目标岗位</text><input class="input" value="{{role}}" data-field="role" bindinput="onText" maxlength="60" placeholder="岗位完整名称" /></view>
+      <view class="field"><text class="label">该岗位的 JD 原文或职位页链接</text><textarea class="textarea jd" value="{{jd}}" data-field="jd" bindinput="onText" maxlength="8000" placeholder="粘贴该岗位自己的职责、要求及招聘条件；公司简介不能替代JD" /></view>
+      <view class="field"><text class="label">个人简历或经历（文本）</text><textarea class="textarea" value="{{resume}}" data-field="resume" bindinput="onText" maxlength="8000" placeholder="教育、技能、项目、实习等；请移除联系方式和证件号" /></view>
+      <view class="field" wx:if="{{materials.length}}"><text class="label">也可选择自己的网申材料</text><view class="material {{item.selected ? 'on' : ''}}" wx:for="{{materials}}" wx:key="id" data-i="{{index}}" bindtap="toggleMaterial">{{item.selected ? '✓ ' : '＋ '}}{{item.title}}</view></view>
+      <view class="source" bindtap="goMaterials">去材料库补充经历 ›</view>
+      <view class="hint">缺口表示材料尚未体现，不代表你没有能力。未知项不会被当作符合。</view>
+      <view class="hint">点击分析会把本页 JD 和所选个人材料发给智谱 AI 处理。分析结果只保存在你的账号下。</view>
+    </view>
+    <view class="card result" id="match-result" wx:if="{{result}}">
+      <view class="section">AI 比较结果 · 私有</view>
+      <view class="conflict" wx:if="{{result.educationConflict}}">JD写明的最低学历高于你保存的学历，请先确认资格。</view>
+      <view class="conflict" wx:if="{{result.roleMismatch}}">JD里的岗位名称与目标岗位提示不同，请检查是否粘贴了正确的职位。</view>
+      <view class="section subheading">岗位要求及原文</view>
+      <view class="fact" wx:for="{{result.evidence.fields}}" wx:key="key"><view class="e-row"><text class="e-label">{{item.label}}</text><text class="e-value">{{item.value}}</text><text class="scope">{{item.scope === 'job' ? 'JD原文' : '未知'}}</text></view><view class="quote" wx:if="{{item.quote}}">“{{item.quote}}”</view></view>
+      <view class="source" wx:if="{{result.evidence.url}}" data-url="{{result.evidence.url}}" bindtap="copySource">复制职位页链接 ›</view>
+      <view class="hint">{{result.evidence.source}} · {{result.at}}</view>
+      <view class="section subheading good">为什么适合</view>
+      <view class="match" wx:for="{{result.analysis.matches}}" wx:key="index"><view class="requirement">{{item.requirement}}</view><view class="quote">JD：{{item.jdQuote}}</view><view class="quote">你的材料：{{item.resumeQuote}}</view><view class="hint">{{item.reason}}</view></view>
+      <view class="hint" wx:if="{{!result.analysis.matches.length}}">尚未找到双方都有原文支持的匹配点。</view>
+      <view class="section subheading warn">材料中缺少什么</view>
+      <view class="match" wx:for="{{result.analysis.gaps}}" wx:key="index"><view class="requirement">{{item.requirement}}</view><view class="quote">JD：{{item.jdQuote}}</view><view class="hint">{{item.reason}}</view></view>
+      <view class="hint" wx:if="{{!result.analysis.gaps.length}}">暂未识别出有JD原文支持的材料缺口，仍需自己核对完整要求。</view>
+      <view class="section subheading">哪些要求尚未知</view><view class="unknown" wx:for="{{result.analysis.unknown}}" wx:key="index">• {{item}}</view>
+      <view class="hint">{{result.note}}</view>
+    </view>
+  </block>
+  <view class="alert" wx:if="{{error}}">{{error}}</view>
+  <view class="fixbar" wx:if="{{evidence}}"><button class="btn primary" bindtap="analyze" disabled="{{busy}}">{{busy ? 'AI正在对照原文…' : '分析JD与个人材料'}}</button></view>
+</view>

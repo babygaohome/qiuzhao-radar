@@ -1,0 +1,95 @@
+{
+  "version": 2,
+  "checkedAt": "2026-10-01",
+  "scope": "企业公众号与招聘汇总号；名称确认不等于账号ID确认或当前岗位已核实",
+  "sources": [
+    {
+      "company": "中国大唐集团有限公司",
+      "accountName": "中国大唐",
+      "status": "corporate_site_confirmed",
+      "proofUrl": "https://www.china-cdt.com/"
+    },
+    {
+      "company": "三七互娱",
+      "accountName": "三七互娱招聘",
+      "status": "corporate_site_confirmed",
+      "proofUrl": "https://zhaopin.37.com/index.php?a=qa&c=campus&m=Home",
+      "warning": "QA是2025届，岗位需另查新公告"
+    },
+    {
+      "company": "广东小天才科技有限公司",
+      "accountName": "小天才招聘",
+      "status": "reference_only",
+      "proofUrl": "https://career.nankai.edu.cn/correcruit/content/id/118951.html"
+    },
+    {
+      "company": "华润万象商业",
+      "accountName": "华润万象生活招聘",
+      "status": "reference_only",
+      "proofUrl": "https://career.csu.edu.cn/campus/view/id/590429"
+    },
+    {
+      "company": "深圳市鹏新旭技术有限公司",
+      "accountName": "鹏新旭招聘",
+      "status": "reference_only",
+      "proofUrl": "https://job.hust.edu.cn/zpinfo1/2407375.htm"
+    },
+    {
+      "company": "Ampace新能安",
+      "accountName": "Ampace新能安招聘",
+      "status": "reference_only",
+      "proofUrl": "https://job.tju.edu.cn/recruitment/content/type/2/id/6141.html"
+    },
+    {
+      "company": "",
+      "accountName": "国资小新",
+      "publisher": "国务院国资委",
+      "sourceKind": "recruitment_aggregator",
+      "region": "全国",
+      "nameStatus": "official_name_confirmed",
+      "proofUrl": "https://www.sasac.gov.cn/n2588020/n2877938/n2879597/n2879599/c25582268/content.html",
+      "checkedAt": "2026-10-01"
+    },
+    {
+      "company": "",
+      "accountName": "国家大学生就业服务平台",
+      "wechatId": "ncssfwh",
+      "publisher": "教育部学生服务与素质发展中心",
+      "sourceKind": "recruitment_aggregator",
+      "region": "全国",
+      "nameStatus": "official_name_confirmed",
+      "proofUrl": "https://www.ncss.cn/ncss/jydt/yw/202311/20231109/2293164849.html",
+      "checkedAt": "2026-10-01"
+    },
+    {
+      "company": "",
+      "accountName": "广州人社",
+      "publisher": "广州市人力资源和社会保障局",
+      "sourceKind": "recruitment_aggregator",
+      "region": "广东/广州",
+      "nameStatus": "official_name_confirmed",
+      "proofUrl": "https://www.gzns.gov.cn/zwgk/bzml/sdly/jyly/content/post_9452430.html",
+      "checkedAt": "2026-10-01"
+    },
+    {
+      "company": "",
+      "accountName": "乐业上海",
+      "publisher": "上海公共就业服务",
+      "sourceKind": "recruitment_aggregator",
+      "region": "上海",
+      "nameStatus": "official_name_confirmed",
+      "proofUrl": "https://rsj.sh.gov.cn/tddyal_17170/20200617/t0035_1371480.html",
+      "checkedAt": "2026-10-01"
+    },
+    {
+      "company": "",
+      "accountName": "花都人才",
+      "publisher": "广州市花都区公共就业人才服务",
+      "sourceKind": "recruitment_aggregator",
+      "region": "广东/广州/花都",
+      "nameStatus": "official_name_confirmed",
+      "proofUrl": "https://www.huadu.gov.cn/zfxxgkml/gzshdqrlzyhshbzj/content/post_9491691.html",
+      "checkedAt": "2026-10-01"
+    }
+  ]
+}

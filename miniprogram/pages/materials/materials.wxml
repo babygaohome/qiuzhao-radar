@@ -1,0 +1,55 @@
+<view class="wrap">
+  <view class="banner" wx:if="{{company}}">正在为「{{company}}」准备材料：点材料下面的「按这家公司改写」，AI 会结合公司和岗位改一版。</view>
+  <view class="intro muted small" wx:else>把网申里常见问题的回答存在这里，填网申时一键复制。打开某家公司的详情页进来，还能让 AI 按那家公司改写。只有你自己能看到。</view>
+  <view class="intro muted small">点击 AI 润色或改写时，所选材料会发给智谱 AI 处理。</view>
+
+  <view class="card editor" wx:if="{{editing}}">
+    <view class="field"><text class="label">标题</text><input class="input" value="{{draft.title}}" maxlength="30" placeholder="如：自我介绍" bindinput="onTitle" /></view>
+    <view class="field"><text class="label">内容（{{draft.content.length}}/3000）</text>
+      <textarea class="textarea big" value="{{draft.content}}" maxlength="3000" auto-height placeholder="写下你的回答…" bindinput="onContent" /></view>
+    <view class="actions"><button class="btn" bindtap="cancelEdit">取消</button><button class="btn primary" bindtap="saveDraft" disabled="{{saving}}">保存</button></view>
+  </view>
+
+  <block wx:else>
+    <view class="tpls">
+      <view class="muted small">快速新建：</view>
+      <view class="pickwrap">
+        <view wx:for="{{templates}}" wx:key="*this" class="fchip" data-t="{{item}}" bindtap="newFrom">{{item}}</view>
+        <view class="fchip on" data-t="" bindtap="newFrom">+ 自定义</view>
+      </view>
+    </view>
+
+    <view class="polishbar" wx:if="{{materials.length}}">
+      <text class="muted small">AI 润色：</text>
+      <picker range="{{styles}}" value="{{styleIdx}}" bindchange="onStyle"><view class="fbtn">{{styles[styleIdx]}} ▾</view></picker>
+      <picker range="{{limits}}" value="{{limitIdx}}" bindchange="onLimit"><view class="fbtn">{{limits[limitIdx]}} ▾</view></picker>
+    </view>
+
+    <view class="empty" wx:if="{{loaded && !materials.length}}">还没有材料，点上面的题目开始写第一份。</view>
+    <view wx:for="{{materials}}" wx:key="id" class="card mat">
+      <view class="mh">
+        <text class="mt">{{item.title}}</text>
+        <text class="mf muted small" wx:if="{{item.forCompany}}">{{item.forCompany}}版</text>
+      </view>
+      <view class="mc {{open[item.id] ? '' : 'clip'}}" data-id="{{item.id}}" bindtap="toggle">{{item.content || '（空）'}}</view>
+      <view class="ops">
+        <text class="op" data-i="{{index}}" bindtap="copy">复制</text>
+        <text class="op" data-i="{{index}}" bindtap="edit">编辑</text>
+        <text class="op bad" data-i="{{index}}" bindtap="remove">删除</text>
+        <text class="op ai" wx:if="{{item.content}}" data-i="{{index}}" bindtap="polish">{{polishing === index ? 'AI 润色中…' : 'AI 润色'}}</text>
+        <text class="op ai" wx:if="{{cid && item.content}}" data-i="{{index}}" bindtap="tailor">{{tailoring === index ? 'AI 改写中…' : '按这家公司改写'}}</text>
+      </view>
+      <view class="result" wx:if="{{result && result.i === index}}">
+        <view class="rh">{{result.kind === 'polish' ? 'AI 润色版 · ' + result.style : 'AI 改写版'}}<text class="muted small">（{{result.length}} 字{{result.changes ? '，' + result.changes : ''}}）</text></view>
+        <view class="rc">{{result.text}}</view>
+        <view class="ops">
+          <text class="op" bindtap="copyResult">复制</text>
+          <text class="op" wx:if="{{result.kind === 'polish'}}" bindtap="replaceResult">替换原文</text>
+          <text class="op" bindtap="saveResult">另存为「{{result.saveTitle}}」</text>
+          <text class="op bad" bindtap="dropResult">不要了</text>
+        </view>
+        <view class="muted small">{{result.kind === 'polish' ? 'AI 只改语言和结构，不会加入新的经历；用之前请自己再读一遍。' : 'AI 只根据公司名、行业和岗位改写，没有加入新经历；用之前请自己再读一遍。'}}</view>
+      </view>
+    </view>
+  </block>
+</view>

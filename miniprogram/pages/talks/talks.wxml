@@ -1,0 +1,28 @@
+<view class="wrap">
+  <view class="intro">汇总各高校公开的宣讲会、双选会，每 2 小时更新。少数场次会临时改时间、地点或取消，出发前以学校就业网和企业通知为准。</view>
+  <view class="bar">
+    <view wx:for="{{days}}" wx:key="k" class="fchip {{day === item.k ? 'on' : ''}}" data-k="{{item.k}}" bindtap="onDay">{{item.t}}</view>
+  </view>
+  <view class="bar">
+    <view wx:for="{{cities}}" wx:key="*this" class="tchip {{cityOn[item] ? 'on' : ''}}" data-c="{{item}}" bindtap="onCity">{{cityOn[item] ? '✓ ' : ''}}{{item}}</view>
+    <view class="tchip {{mine ? 'on' : ''}}" bindtap="onMine">{{mine ? '✓ ' : ''}}只看我标记的公司</view>
+  </view>
+  <input class="search" placeholder="搜公司或学校" value="{{q}}" bindinput="onQ" />
+  <view class="count muted small" wx:if="{{total != null}}">共 {{total}} 场</view>
+
+  <view class="list">
+    <view wx:for="{{items}}" wx:key="slug" class="item talk">
+      <view class="when"><text class="wd">{{item.day}}</text><text class="ww">{{item.week}}</text><text class="wt">{{item.time || '全天'}}</text></view>
+      <view class="main">
+        <view class="name">{{item.company}}</view>
+        <view class="ttl">{{item.title}}</view>
+        <view class="place">{{item.place}}</view>
+        <view class="ops"><text class="op" data-i="{{index}}" bindtap="addEvent">＋ 加到日程</text><text class="op" data-i="{{index}}" bindtap="addCalendar">📅 手机日历</text><text class="op" data-url="{{item.url}}" bindtap="copy">复制详情链接</text></view>
+      </view>
+    </view>
+  </view>
+  <view class="empty" wx:if="{{!loading && !items.length && !error}}">没有符合条件的宣讲会{{cities.length ? '，试试取消城市筛选' : ''}}</view>
+  <view class="empty" wx:if="{{error}}">{{error}}</view>
+  <view class="empty small" wx:if="{{loading}}">加载中…</view>
+  <view class="empty small" wx:if="{{done && items.length}}">到底了</view>
+</view>

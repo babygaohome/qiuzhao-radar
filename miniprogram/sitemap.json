@@ -1,0 +1,4 @@
+{
+  "desc": "个人求职工具，不需要被微信搜索收录",
+  "rules": [{ "action": "disallow", "page": "*" }]
+}

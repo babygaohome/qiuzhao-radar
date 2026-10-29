@@ -1,0 +1,19 @@
+.intro { margin: 0 4rpx 20rpx; }
+.imp { background: rgba(23, 128, 74, .1); color: var(--ok); border-radius: 18rpx; padding: 16rpx 22rpx; font-size: 26rpx; margin-bottom: 20rpx; }
+.check { display: flex; align-items: center; font-size: 25rpx; color: var(--muted); margin-top: 16rpx; }
+.tablewrap { margin-top: 24rpx; width: 100%; }
+.table { display: inline-block; min-width: 100%; background: var(--surface); border: 1rpx solid var(--line); border-radius: 20rpx; overflow: hidden; }
+.tr { display: flex; border-top: 1rpx solid var(--line); }
+.tr:first-child { border-top: 0; }
+.th { width: 170rpx; flex: none; padding: 16rpx; font-size: 24rpx; color: var(--muted); background: var(--sunk); }
+.td { width: 230rpx; flex: none; padding: 16rpx; font-size: 25rpx; word-break: break-all; font-family: var(--mono); }
+.head .td { font-family: inherit; font-weight: 700; color: var(--accent); }
+.td.best { color: var(--ok); font-weight: 700; }
+.td.del { color: var(--bad); font-family: inherit; }
+.ai { margin-top: 24rpx; }
+.ana { margin-top: 20rpx; }
+.sum { font-size: 27rpx; line-height: 1.6; background: rgba(31, 79, 209, .07); border-radius: 14rpx; padding: 14rpx 18rpx; }
+.rk { margin-top: 16rpx; font-size: 26rpx; }
+.rn { font-weight: 700; }
+.pro { color: var(--ok); margin-top: 4rpx; }
+.con { color: var(--warn); margin-top: 2rpx; }

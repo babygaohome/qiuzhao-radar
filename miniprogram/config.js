@@ -1,0 +1,6 @@
+// 云开发环境 ID：微信开发者工具 → 云开发 → 设置 → 环境 ID，复制过来填在这里
+module.exports = {
+  envId: 'cloud1-d5g4idwry1a351b71',
+  // 订阅消息模板 ID：小程序后台 → 功能 → 订阅消息 → 我的模板。留空则不显示提醒按钮
+  remindTmplId: ''
+}

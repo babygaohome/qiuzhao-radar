@@ -1,0 +1,8 @@
+iteration	errors_before	errors_after	fix_applied	status
+1	12	10	维护函数代码拒绝客户端身份；函数规则单独拒绝crawler/remind	improved
+2	10	8	链接先存candidate，核对企业和2027原文；HTTP及403不视为官方证据	improved
+3	8	6	AI输入限制、单批租约、每人额度及全站模型预算	improved
+4	6	5	固定SDK4与补丁依赖，三个实际构建包audit零告警	improved
+5	5	4	恢复分批和会话续传，确定性个人公司ID；原子profile更新	improved
+6	4	3	加密备份与文件清理；来源队列扩展；启用脱敏日志	improved
+7	3	3	旧函数运行时不能原地修改；真实第二账号和外部资源告警验收尚缺	blocked
