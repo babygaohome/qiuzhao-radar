@@ -1,0 +1,17 @@
+{
+  "name": "crawler",
+  "version": "1.0.0",
+  "description": "秋招雷达定时采集：每 2 小时抓取汇总站最新招聘并合并入库",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "4.0.2",
+    "lodash": "4.18.1",
+    "lodash.set": "file:./vendor/lodash-set",
+    "lodash.unset": "file:./vendor/lodash-unset"
+  },
+  "overrides": {
+    "axios": "0.33.0",
+    "lodash.set": "$lodash.set",
+    "lodash.unset": "$lodash.unset"
+  }
+}

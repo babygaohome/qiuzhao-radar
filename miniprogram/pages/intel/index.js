@@ -3,6 +3,7 @@ const config = require('../../config.js')
 const demoItems = require('./demo-fixtures.js')
 
 const CATEGORY_LABELS = { jobs: '求职', ai: 'AI', semiconductor: '半导体', electronics: '电子' }
+const KIND_LABELS = { open_source_release: '开源项目版本发布', developer_release: '开发工具版本发布' }
 
 function dateLabel (value) {
   if (typeof value !== 'string' || !value) return '发布时间未知'
@@ -14,13 +15,16 @@ function dateLabel (value) {
 
 function presentItem (item) {
   const status = item && item.summaryStatus
-  const statusLabels = { grounded: '有来源依据', reviewed: '已核对', unknown: '摘要状态未知' }
+  const statusLabels = { grounded: '有来源依据', reviewed: '已核对', unavailable: '未提供中文摘要', unknown: '摘要状态未知' }
+  const displayType = KIND_LABELS[item && item.sourceKind] || '公开信息条目'
   return Object.assign({}, item, {
     categoryLabel: CATEGORY_LABELS[item && item.category] || '分类未知',
     displayDate: dateLabel(item && item.publishedAt),
     displaySource: item && item.sourceName || '来源未知',
-    displaySummary: item && item.summaryZh || '暂无可核实摘要',
-    displaySummaryStatus: statusLabels[status] || '摘要状态未知'
+    displaySummary: item && item.summaryZh || '该条目未提供中文摘要，请查看原始发布说明。',
+    displaySummaryStatus: statusLabels[status] || '摘要状态未知',
+    displayType,
+    displayTitle: item && item.title || (item && item.version ? `${displayType} ${item.version}` : '标题未知')
   })
 }
 
@@ -31,7 +35,7 @@ function filteredDemo (category) {
 Page({
   data: {
     items: [], loading: false, loadingMore: false, error: '', moreError: '',
-    enabled: false, demo: false, nextCursor: null, digestAtLabel: '',
+    enabled: false, demo: false, nextCursor: null, digestAtLabel: '', windowNotice: '',
     filters: [
       { key: 'all', label: '全部' }, { key: 'ai', label: 'AI' },
       { key: 'semiconductor', label: '半导体' }, { key: 'electronics', label: '电子' }
@@ -77,7 +81,7 @@ Page({
     const keepItems = options.keepItems === true
     this.setData({
       loading: true, loadingMore: false, error: '', moreError: '', nextCursor: null,
-      items: keepItems ? this.data.items : [], digestAtLabel: ''
+      items: keepItems ? this.data.items : [], digestAtLabel: '', windowNotice: ''
     })
     try {
       const result = await api('intelFeed', { category, limit: 20 })
@@ -85,12 +89,18 @@ Page({
       const items = Array.isArray(result && result.items) ? result.items.map(presentItem) : []
       this.setData({
         items, nextCursor: result && result.nextCursor || null,
+        windowNotice: result && result.windowLimited ? '当前仅展示按记录编号排序的最多 300 条已发布条目。' : '',
         digestAtLabel: result && result.digestAt ? `更新于 ${dateLabel(result.digestAt)}` : '',
         loading: false, error: '', moreError: ''
       })
     } catch (error) {
       if (!this.alive || seq !== this.seq) return
-      this.setData({ loading: false, error: (error && error.message) || '暂时无法加载情报' })
+      const message = error && error.message
+      if (error && error.code === 'feature_disabled') {
+        this.setData({ enabled: false, loading: false, error: '', items: [], nextCursor: null })
+        return
+      }
+      this.setData({ loading: false, error: message === '情报功能暂未开启' ? message : (message || '暂时无法加载情报') })
     }
   },
 

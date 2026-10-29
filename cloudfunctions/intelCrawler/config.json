@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "openapi": []
+  },
+  "timeout": 60,
+  "triggers": [
+    {
+      "name": "intelCrawlerEvery6Hours",
+      "type": "timer",
+      "config": "0 0 */6 * * * *"
+    }
+  ]
+}
