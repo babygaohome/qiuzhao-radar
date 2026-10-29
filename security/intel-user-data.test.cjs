@@ -7,6 +7,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const vm = require('node:vm')
 const { createIntelHandlers } = require('../cloudfunctions/api/intel/handlers')
+const { readOptionalDocument } = require('../cloudfunctions/api/intel/preferences')
 const root = path.resolve(__dirname, '..')
 const source = fs.readFileSync(path.join(__dirname, 'isolation.test.cjs'), 'utf8').split('let passed = 0')[0]
 const box = { require, __dirname, console, Buffer, URL, setTimeout, clearTimeout }
@@ -15,6 +16,28 @@ vm.runInNewContext(source + '\nthis.harness = harness', box)
 
 async function test () {
   const h = box.harness()
+  const rawCollection = h.db.collection.bind(h.db)
+  h.db.collection = name => {
+    const collection = rawCollection(name)
+    if (!['intel_preferences', 'intel_feedback'].includes(name)) return collection
+    return new Proxy(collection, { get (target, key) {
+      if (key === 'doc') return id => {
+        const doc = target.doc(id)
+        return new Proxy(doc, { get (document, method) {
+          if (method === 'get') return async () => {
+            try { return await document.get() } catch (error) {
+              if (error && error.message === 'not found') throw Object.assign(new Error(`document.get:fail document with _id ${id} does not exist`), { code: -1 })
+              throw error
+            }
+          }
+          const value = Reflect.get(document, method)
+          return typeof value === 'function' ? value.bind(document) : value
+        } })
+      }
+      const value = Reflect.get(target, key)
+      return typeof value === 'function' ? value.bind(target) : value
+    } })
+  }
   const createdCollections = []
   const originalCreateCollection = h.db.createCollection.bind(h.db)
   h.db.createCollection = async name => { createdCollections.push(name); return originalCreateCollection(name) }
@@ -152,6 +175,15 @@ async function test () {
   ])
   assert.equal(initialWrites.filter(x => x.ok).length, 1, 'first-time preference creation must be atomic')
   assert.equal(initialWrites.filter(x => x.error === 'conflict').length, 1)
+
+  // Only the SDK's exact missing-document error may produce the empty preference state.
+  const getError = error => ({ collection: () => ({ doc: () => ({ get: async () => { throw error } }) }) })
+  assert.equal(await readOptionalDocument(getError(Object.assign(new Error('document with _id test-user does not exist'), { code: -1 })), 'intel_preferences', 'test-user'), null)
+  assert.equal(await readOptionalDocument(getError(Object.assign(new Error('document absent'), { errCode: 'DATABASE_DOCUMENT_NOT_EXIST' })), 'intel_preferences', 'test-user'), null)
+  await assert.rejects(readOptionalDocument(getError(Object.assign(new Error('document with _id test-user does not exist'), { code: -502005 })), 'intel_preferences', 'test-user'))
+  await assert.rejects(readOptionalDocument(getError(Object.assign(new Error('permission denied: document with _id test-user does not exist'), { code: -1 })), 'intel_preferences', 'test-user'))
+  await assert.rejects(readOptionalDocument(getError(Object.assign(new Error('collection intel_preferences does not exist'), { code: -1 })), 'intel_preferences', 'test-user'))
+  await assert.rejects(readOptionalDocument(getError(Object.assign(new Error('document does not exist'), { code: -1 })), 'intel_preferences', 'test-user'))
 
   // A missing configured collection is a server error, not an empty preference record.
   h.db.collection = name => {

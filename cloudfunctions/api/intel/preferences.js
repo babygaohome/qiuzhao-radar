@@ -12,8 +12,10 @@ function fail (code, message, extra) { return Object.assign({ error: code, messa
 function isObject (x) { return !!x && typeof x === 'object' && !Array.isArray(x) }
 function isMissingDocument (error) {
   const message = String(error && (error.message || error.errMsg || error))
-  if (/collection.*(?:not exist|not found)|database collection not exist/i.test(message)) return false
-  return /not found|document does not exist|document missing/i.test(message)
+  if (/permission|denied|collection.*(?:not exist|not found)|database collection not exist/i.test(message)) return false
+  const code = error && (error.errCode !== undefined ? error.errCode : error.code)
+  if (code === 'DATABASE_DOCUMENT_NOT_EXIST') return true
+  return code === -1 && /document with _id .+ does not exist/i.test(message)
 }
 async function readOptionalDocument (db, collection, id) {
   try { const result = await db.collection(collection).doc(id).get(); return result && result.data || null } catch (error) {
