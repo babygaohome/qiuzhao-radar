@@ -1,6 +1,7 @@
 'use strict'
 
 const assert = require('node:assert/strict')
+const crypto = require('node:crypto')
 const { createDigestHandlers, createDigestFeatureHandlers, digestId, validTimestamp, DIGEST_ENABLED_ENV } = require('../cloudfunctions/api/intel/digest-handlers')
 const { digestId: snapshotDigestId } = require('../cloudfunctions/intelDigest/snapshot-store')
 
@@ -12,6 +13,8 @@ const now = Date.parse('2026-10-29T02:00:00.000Z')
 function createDb () {
   const tables = new Map()
   const failures = new Map()
+  const updateFailures = new Map()
+  const queryCounts = new Map()
   const command = { in: values => ({ $in: values }), lt: value => ({ $lt: value }) }
   const key = (name, id) => `${name}:${id}`
   function table (name) {
@@ -27,36 +30,60 @@ function createDb () {
             if (failure) throw failure
             const row = table(name).get(id)
             return row ? { data: { ...row } } : { data: null }
+          },
+          async update ({ data }) {
+            const failure = updateFailures.get(key(name, id)) || failures.get(key(name, id))
+            if (failure) throw failure
+            const row = table(name).get(id)
+            if (!row) return { stats: { updated: 0 } }
+            Object.assign(row, data)
+            return { stats: { updated: 1 } }
           }
         }
       },
       where (query) {
         let order = null
         let limit = Infinity
+        let projection = null
         return {
           orderBy (field, direction) { order = [field, direction]; return this },
           limit (value) { limit = value; return this },
-          field () { return this },
+          field (value) { projection = value; return this },
           async get () {
+            queryCounts.set(name, (queryCounts.get(name) || 0) + 1)
+            const queryFailure = failures.get(key(name, '__query__'))
+            if (queryFailure) throw queryFailure
             const rows = [...table(name).values()].filter(row => Object.entries(query).every(([field, value]) => {
               if (value && Array.isArray(value.$in)) return value.$in.includes(row[field])
               if (value && typeof value.$lt === 'string') return String(row[field]) < value.$lt
               return row[field] === value
             }))
             if (order) rows.sort((a, b) => order[1] === 'desc' ? String(b[order[0]]).localeCompare(String(a[order[0]])) : String(a[order[0]]).localeCompare(String(b[order[0]])))
-            return { data: rows.slice(0, limit).map(row => ({ ...row })) }
+            return { data: rows.slice(0, limit).map(row => projection
+              ? Object.fromEntries(Object.keys(projection).filter(field => projection[field] === true && row[field] !== undefined).map(field => [field, row[field]]))
+              : { ...row }) }
           }
         }
       }
     }
   }
-  return {
+  const db = {
     command,
     collection,
     put (name, id, row) { table(name).set(id, { ...row, _id: id }) },
     fail (name, id, error) { failures.set(key(name, id), error) },
-    rows (name) { return [...table(name).values()] }
+    failUpdate (name, id, error) { updateFailures.set(key(name, id), error) },
+    failQuery (name, error) { failures.set(key(name, '__query__'), error) },
+    queryCount (name) { return queryCounts.get(name) || 0 },
+    rows (name) { return [...table(name).values()] },
+    runTransaction: fn => fn(db)
   }
+  return db
+}
+
+function feedbackId (openid, itemId, generation) {
+  const scope = generation ? openid + '\0' + generation + '\0' + itemId : openid + '\0' + itemId
+  return crypto.createHash('sha256').update(scope).digest('hex')
 }
 
 function preference (overrides = {}) {
@@ -120,6 +147,9 @@ async function run () {
   db.put('intel_items', 'item-1', item('item-1'))
   db.put('intel_items', 'item-2', item('item-2', { privateNote: 'secret two' }))
   db.put('intel_items', 'other-account-private', item('other-account-private', { sourceIds: ['unapproved-source'] }))
+  db.put('intel_feedback', feedbackId(A, 'item-2', 2), { openid: A, itemId: 'item-2', generation: 2, state: { bookmarked: true } })
+  db.put('intel_feedback', feedbackId(A, 'item-1', 1), { openid: A, itemId: 'item-1', generation: 1, state: { bookmarked: true } })
+  db.put('intel_feedback', feedbackId(B, 'item-1', 2), { openid: B, itemId: 'item-1', generation: 2, state: { bookmarked: true } })
 
   let jobLoadCalls = 0
   let requestedJobIdentity = ''
@@ -138,6 +168,7 @@ async function run () {
   const todayResult = await handlers.intelDigestToday({ openid: B }, A)
   check(todayResult.digest.localDate === today, 'date uses server supplied timezone and current time')
   check(todayResult.digest.items.map(x => x.itemId).join(',') === 'item-2,item-1', 'saved ordering is preserved')
+  check(todayResult.digest.items[0].feedback.bookmarked === true && todayResult.digest.items[1].feedback.bookmarked === false, 'today attaches only current-user current-generation bookmark state')
   check(todayResult.digest.jobItems.length === 1 && todayResult.digest.jobItems[0].companyId === 'verified-company', 'only currently revalidated snapshot companies are shown')
   check(requestedJobIdentity === A, 'job loader receives only server supplied identity')
   check(!JSON.stringify(todayResult.digest.jobItems).includes('privateNote'), 'job private fields are omitted')
@@ -147,6 +178,63 @@ async function run () {
   const byDate = await handlers.intelDigestByDate({ localDate: today, openid: B }, A)
   check(byDate.digest.localDate === today && byDate.digest.items.map(x => x.itemId).join(',') === 'item-2,item-1', 'by-date reuses scoped snapshot and ignores event identity')
   check(byDate.digest.jobItems.length === 1 && byDate.digest.jobItems[0].companyId === 'verified-company', 'by-date jobs are revalidated for server user')
+  check(byDate.digest.items[0].feedback.bookmarked === true && byDate.digest.items[1].feedback.bookmarked === false, 'by-date attaches only current-user current-generation bookmark state')
+  db.put('intel_feedback', feedbackId(A, 'item-2', 2), { openid: A, itemId: 'item-2', generation: 2, state: { bookmarked: false } })
+  check((await handlers.intelDigestByDate({ localDate: today }, A)).digest.items[0].feedback.bookmarked === false, 'bookmark revocation is reflected on subsequent reads')
+  const emptyFeedbackCalls = db.queryCount('intel_feedback')
+  const emptySnapshot = snapshot(A, '2026-10-26', { itemIds: [], jobCompanyIds: [] })
+  db.put('intel_digests', emptySnapshot._id, emptySnapshot)
+  await handlers.intelDigestByDate({ localDate: '2026-10-26' }, A)
+  check(db.queryCount('intel_feedback') === emptyFeedbackCalls, 'empty item snapshots do not query feedback')
+  const marked = await handlers.intelMarkDigestRead({ localDate: today, snapshotToken: todayResult.digest.snapshotToken, openid: B }, A)
+  check(marked.ok === true && marked.readAt === new Date(now).toISOString(), 'read state uses server identity and server clock')
+  const storedReadAt = db.rows('intel_digests').find(row => row._id === digestId(A, today, 2, 1, ZONE)).readAt
+  check(storedReadAt === marked.readAt, 'read state updates the existing owned snapshot')
+  const accountBSnapshotId = digestId(B, today, 2, 1, 'Pacific/Auckland')
+  check(!db.rows('intel_digests').find(row => row._id === accountBSnapshotId).readAt, 'event identity cannot mark another user snapshot')
+  await assert.rejects(handlers.intelMarkDigestRead({ localDate: today, snapshotToken: accountBSnapshotId }, A), error => error && error.code === 'stale_digest')
+  checks++
+  check(db.rows('intel_digests').find(row => row._id === snapA._id).readAt === marked.readAt, 'cross-account token does not alter the caller snapshot')
+  check((await handlers.intelMarkDigestRead({ localDate: today, snapshotToken: todayResult.digest.snapshotToken }, A)).readAt === storedReadAt, 'read marking is idempotent')
+  check((await handlers.intelDigestToday({ openid: B }, A)).digest.readAt === storedReadAt, 'today returns read timestamp')
+  check((await handlers.intelDigestHistory({}, A)).digests.find(row => row.localDate === today).readAt === storedReadAt, 'history returns read timestamp')
+  const beforeMissingRead = db.rows('intel_digests').length
+  const missingReadId = digestId(A, '2026-10-27', 2, 1, ZONE)
+  check((await handlers.intelMarkDigestRead({ localDate: '2026-10-27', snapshotToken: missingReadId }, A)).error === 'not_found' && db.rows('intel_digests').length === beforeMissingRead, 'missing snapshot is never created to mark read')
+  await assert.rejects(handlers.intelMarkDigestRead({ localDate: '2026-10-30' }, A), error => error && error.code === 'bad_request')
+  checks++
+  db.put('intel_preferences', A, preference({ deleted: true }))
+  check((await handlers.intelMarkDigestRead({ localDate: today, snapshotToken: todayResult.digest.snapshotToken }, A)).error === 'feature_disabled', 'deleted users cannot change digest read state')
+  db.put('intel_preferences', A, preference())
+  const staleReadDb = createDb()
+  staleReadDb.put('intel_preferences', A, preference({ timezone: 'Pacific/Auckland' }))
+  const oldZoneSnapshot = snapshot(A, today, { timezone: ZONE, generation: 2, digestGeneration: 1 })
+  staleReadDb.put('intel_digests', oldZoneSnapshot._id, oldZoneSnapshot)
+  const staleReadHandlers = createDigestHandlers({ db: staleReadDb, now: () => now })
+  await assert.rejects(staleReadHandlers.intelMarkDigestRead({ localDate: today, snapshotToken: oldZoneSnapshot._id }, A), error => error && error.code === 'stale_digest')
+  checks++
+  const oldGenerationSnapshot = snapshot(A, today, { generation: 1, digestGeneration: 1 })
+  staleReadDb.put('intel_digests', oldGenerationSnapshot._id, oldGenerationSnapshot)
+  await assert.rejects(staleReadHandlers.intelMarkDigestRead({ localDate: today, snapshotToken: oldGenerationSnapshot._id }, A), error => error && error.code === 'stale_digest')
+  checks++
+  const aReadAfterStaleToken = staleReadDb.rows('intel_digests').find(row => row._id === oldZoneSnapshot._id).readAt
+  check(aReadAfterStaleToken === undefined, 'stale timezone/generation tokens do not update old snapshots')
+  const readFailureDb = createDb()
+  readFailureDb.put('intel_preferences', A, preference())
+  const readFailureSnapshot = snapshot(A, today)
+  readFailureDb.put('intel_digests', readFailureSnapshot._id, readFailureSnapshot)
+  readFailureDb.fail('intel_digests', readFailureSnapshot._id, Object.assign(new Error('write unavailable'), { errCode: -1 }))
+  await assert.rejects(createDigestHandlers({ db: readFailureDb, now: () => now }).intelMarkDigestRead({ localDate: today, snapshotToken: readFailureSnapshot._id }, A), /write unavailable/)
+  checks++
+  check(!readFailureDb.rows('intel_digests')[0].readAt, 'failed read marking does not report success or alter the snapshot')
+  const writeFailureDb = createDb()
+  writeFailureDb.put('intel_preferences', A, preference())
+  const writeFailureSnapshot = snapshot(A, today)
+  writeFailureDb.put('intel_digests', writeFailureSnapshot._id, writeFailureSnapshot)
+  writeFailureDb.failUpdate('intel_digests', writeFailureSnapshot._id, Object.assign(new Error('transaction write failed'), { errCode: -1 }))
+  await assert.rejects(createDigestHandlers({ db: writeFailureDb, now: () => now }).intelMarkDigestRead({ localDate: today, snapshotToken: writeFailureSnapshot._id }, A), /transaction write failed/)
+  checks++
+  check(!writeFailureDb.rows('intel_digests')[0].readAt, 'transaction write failure cannot be reported as successful')
   for (const malformedIds of [undefined, 'verified-company', ['verified-company', 'verified-company'], ['a', 'b', 'c', 'd', 'e']]) {
     const malformedDb = createDb()
     malformedDb.put('intel_preferences', A, preference())
@@ -173,8 +261,9 @@ async function run () {
   const disabled = createDigestFeatureHandlers({ enabled: false, db: { collection () { disabledTouches++; throw new Error('must not touch database while disabled') } } })
   const disabledToday = await disabled.intelDigestToday({ openid: B }, A)
   const disabledByDate = await disabled.intelDigestByDate({ openid: B, localDate: today }, A)
+  const disabledMark = await disabled.intelMarkDigestRead({ openid: B, localDate: today, snapshotToken: snapA._id }, A)
   const disabledHistory = await disabled.intelDigestHistory({ openid: B }, A)
-  check(disabledToday.error === 'feature_disabled' && disabledByDate.error === 'feature_disabled' && disabledHistory.error === 'feature_disabled', 'disabled digest routes return a feature flag response')
+  check(disabledToday.error === 'feature_disabled' && disabledByDate.error === 'feature_disabled' && disabledMark.error === 'feature_disabled' && disabledHistory.error === 'feature_disabled', 'disabled digest routes return a feature flag response')
   check(disabledTouches === 0, 'disabled digest routes do not access collections')
   const disabledJobs = createDigestFeatureHandlers({ enabled: false, loadJobItems () { throw new Error('disabled feature must not read jobs') }, db })
   check((await disabledJobs.intelDigestToday({}, A)).error === 'feature_disabled', 'disabled jobs route is inert')
@@ -185,7 +274,8 @@ async function run () {
   check(gatedByDate.digest.localDate === today, 'enabled by-date route uses the server supplied identity over request data')
 
   const history = await handlers.intelDigestHistory({ openid: B }, A)
-  check(history.digests.length === 1 && history.digests[0].localDate === today, 'request event identity cannot substitute for server identity')
+  check(history.digests.length === 2 && history.digests[0].localDate === today && history.digests[1].localDate === '2026-10-26', 'request event identity cannot substitute for server identity')
+  check(history.digests[0].snapshotToken === snapA._id, 'history exposes only the owner-scoped snapshot token required for read state')
   check(history.digests[0].itemCount === 5 && history.nextCursor === null, 'history exposes bounded summary only')
 
   for (let offset = 1; offset <= 65; offset++) {
@@ -257,6 +347,13 @@ async function run () {
   errorDb.put('intel_preferences', A, preference())
   errorDb.fail('intel_digests', digestId(A, today, 2, 1, ZONE), Object.assign(new Error('permission denied'), { errCode: -502005 }))
   await assert.rejects(createDigestHandlers({ db: errorDb, now: () => now }).intelDigestToday({}, A), /permission denied/)
+  checks++
+  const feedbackErrorDb = createDb()
+  feedbackErrorDb.put('intel_preferences', A, preference())
+  feedbackErrorDb.put('intel_digests', snapA._id, { ...snapA, jobCompanyIds: [] })
+  feedbackErrorDb.put('intel_items', 'item-1', item('item-1'))
+  feedbackErrorDb.failQuery('intel_feedback', Object.assign(new Error('feedback read denied'), { errCode: -502005 }))
+  await assert.rejects(createDigestHandlers({ db: feedbackErrorDb, now: () => now }).intelDigestToday({}, A), /feedback read denied/)
   checks++
   const missingCollectionDb = { collection: () => ({ doc: () => ({ get: async () => { throw new Error('database collection not exist') } }) }) }
   await assert.rejects(createDigestHandlers({ db: missingCollectionDb, now: () => now }).intelDigestToday({}, A), /collection not exist/)

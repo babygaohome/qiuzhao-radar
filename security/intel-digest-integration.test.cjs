@@ -1,6 +1,7 @@
 'use strict'
 
 const assert = require('node:assert/strict')
+const crypto = require('node:crypto')
 const { createDigestService } = require('../cloudfunctions/intelDigest/service')
 const { createSnapshotStore } = require('../cloudfunctions/intelDigest/snapshot-store')
 const { createDigestHandlers } = require('../cloudfunctions/api/intel/digest-handlers')
@@ -32,6 +33,12 @@ function createDb () {
             return { data: row ? { ...row } : null }
           },
           async set ({ data }) { getTable(name).set(id, { ...data, _id: id }); return { stats: { updated: 1 } } },
+          async update ({ data }) {
+            const old = getTable(name).get(id)
+            if (!old) return { stats: { updated: 0 } }
+            getTable(name).set(id, { ...old, ...data, _id: id })
+            return { stats: { updated: 1 } }
+          },
           async remove () { return { stats: { removed: getTable(name).delete(id) ? 1 : 0 } } }
         }
       },
@@ -197,6 +204,8 @@ async function run () {
   assert.deepEqual(todayA.digest.items.map(item => item.itemId), generated.snapshot.itemIds)
   assert.deepEqual(todayA.digest.items.map(item => item.title), ['Release release-a', 'Release release-b'])
   assert.equal(todayA.digest.items[0].reason, '近期资讯')
+  assert.match(todayA.digest.snapshotToken, /^[a-f0-9]{64}$/)
+  assert.equal(todayA.digest.readAt, null)
   assert.deepEqual(todayA.digest.jobItems, [{
     companyId: 'verified-a',
     title: '软件工程师',
@@ -208,7 +217,7 @@ async function run () {
   assert.deepEqual(Object.keys(todayA.digest.jobItems[0]).sort(),
     ['companyId', 'title', 'company', 'deadline', 'originalUrl', 'reason'].sort())
   const historyA = await readHandlers.intelDigestHistory({}, 'account-a')
-  assert.deepEqual(historyA.digests, [{ localDate: '2026-10-29', itemCount: 3, generatedAt: generated.snapshot.generatedAt }])
+  assert.deepEqual(historyA.digests, [{ localDate: '2026-10-29', snapshotToken: todayA.digest.snapshotToken, itemCount: 3, generatedAt: generated.snapshot.generatedAt, readAt: null }])
   const dateA = await readHandlers.intelDigestByDate({ localDate: '2026-10-29', openid: 'account-a' }, 'account-a')
   assert.deepEqual(dateA, todayA)
 
@@ -218,6 +227,55 @@ async function run () {
   assert.equal(todayB.digest.jobItems.some(item => item.companyId === 'verified-a'), false)
   assert.deepEqual((await readHandlers.intelDigestHistory({}, 'account-b')).digests.map(row => row.itemCount), [1])
   assert.equal((await service.getMine({ authenticatedOpenid: 'account-b' }, '2026-10-29')).itemIds.length, 0)
+
+  // Bookmark state is derived only from this account's current feedback
+  // generation, then returned in the same item shape consumed by the digest UI.
+  const feedbackId = openid => crypto.createHash('sha256')
+    .update(openid + '\0' + 2 + '\0release-a').digest('hex')
+  db.put('intel_feedback', feedbackId('account-a'), {
+    openid: 'account-a', itemId: 'release-a', generation: 2,
+    state: { bookmarked: true, liked: false, disliked: false }
+  })
+  const bPreference = { ...db.rows('intel_preferences').find(row => row._id === 'account-b'), digestGeneration: 2 }
+  db.put('intel_preferences', 'account-b', bPreference)
+  const bSnapshot = {
+    localDate: '2026-10-29', timezone: ZONE, algorithmVersion: 'integration-test',
+    itemIds: ['release-a'], jobCompanyIds: ['verified-b'],
+    generatedAt: new Date(NOW).toISOString(), status: 'ready',
+    generation: bPreference.generation
+  }
+  await store.saveIfAbsent({
+    openid: 'account-b', localDate: bSnapshot.localDate, timezone: ZONE,
+    generation: bPreference.generation, digestGeneration: bPreference.digestGeneration,
+    snapshot: bSnapshot
+  })
+  const aBookmarked = await readHandlers.intelDigestToday({}, 'account-a')
+  const bNotBookmarked = await readHandlers.intelDigestToday({ openid: 'account-a' }, 'account-b')
+  assert.equal(aBookmarked.digest.items[0].feedback.bookmarked, true)
+  assert.equal(bNotBookmarked.digest.items[0].feedback.bookmarked, false)
+
+  // Mark-read updates only the exact owner-scoped snapshot token. Repeating
+  // it is idempotent, while a foreign or stale token cannot write state.
+  const marked = await readHandlers.intelMarkDigestRead({
+    localDate: '2026-10-29', snapshotToken: todayA.digest.snapshotToken, openid: 'account-b'
+  }, 'account-a')
+  assert.deepEqual(Object.keys(marked).sort(), ['ok', 'readAt'])
+  const markedAgain = await readHandlers.intelMarkDigestRead({
+    localDate: '2026-10-29', snapshotToken: todayA.digest.snapshotToken
+  }, 'account-a')
+  assert.equal(markedAgain.readAt, marked.readAt)
+  assert.equal((await readHandlers.intelDigestToday({}, 'account-a')).digest.readAt, marked.readAt)
+  assert.equal((await readHandlers.intelDigestHistory({}, 'account-a')).digests[0].readAt, marked.readAt)
+  await assert.rejects(readHandlers.intelMarkDigestRead({
+    localDate: '2026-10-29', snapshotToken: bNotBookmarked.digest.snapshotToken
+  }, 'account-a'), error => error && error.code === 'stale_digest')
+  const beforeStaleMark = db.rows('intel_digests').find(row => row._id === todayA.digest.snapshotToken).readAt
+  db.put('intel_preferences', 'account-a', { ...db.rows('intel_preferences').find(row => row._id === 'account-a'), digestGeneration: 2 })
+  await assert.rejects(readHandlers.intelMarkDigestRead({
+    localDate: '2026-10-29', snapshotToken: todayA.digest.snapshotToken
+  }, 'account-a'), error => error && error.code === 'stale_digest')
+  assert.equal(db.rows('intel_digests').find(row => row._id === todayA.digest.snapshotToken).readAt, beforeStaleMark)
+  db.put('intel_preferences', 'account-a', makePreference('account-a', { topics: { ai: 0.35, jobs: 0.4 }, digestGeneration: 1 }))
 
   // A closed and re-enabled digest gets a new generation; the prior snapshot is not visible.
   const prefA = db.rows('intel_preferences').find(row => row._id === 'account-a')

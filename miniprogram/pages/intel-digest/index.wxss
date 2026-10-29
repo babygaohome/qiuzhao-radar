@@ -27,4 +27,10 @@
 .digest-history-date { color: var(--ink); font-size: 25rpx; font-weight: 650; }
 .digest-history-count { margin-top: 8rpx; }
 .digest-history-heading { margin: 8rpx 0 18rpx; color: var(--accent); font-size: 23rpx; }
+.digest-read-state { margin: 8rpx 4rpx 16rpx; color: var(--muted); font-size: 20rpx; }
+.digest-read-error, .digest-feedback-error { margin-top: 10rpx; color: var(--muted); font-size: 19rpx; }
+.digest-inline-action { display: inline-flex; margin-left: 14rpx; padding: 0 16rpx; border-radius: 999rpx; color: var(--accent); background: var(--accent-soft); font-size: 19rpx; line-height: 1.8; }
+.digest-inline-action::after, .digest-bookmark::after { border: 0; }
+.digest-bookmark { display: inline-flex; margin: 16rpx 0 0; padding: 6rpx 18rpx; border: 1rpx solid var(--line); border-radius: 999rpx; color: var(--muted); background: transparent; font-size: 20rpx; line-height: 1.7; }
+.digest-bookmark-on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
 @media (prefers-color-scheme: dark) { .digest-action { color: #111722; } }

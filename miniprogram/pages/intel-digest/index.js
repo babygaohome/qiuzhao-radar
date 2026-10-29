@@ -18,7 +18,10 @@ function presentDigestItem (item) {
     sourceName: typeof item.sourceName === 'string' && item.sourceName.trim() ? item.sourceName.trim() : '来源信息暂不可用',
     publishedAt: typeof item.publishedAt === 'string' ? item.publishedAt : '',
     reason: typeof item.reason === 'string' ? item.reason : '',
-    originalUrl
+    originalUrl,
+    feedback: { bookmarked: !!(item.feedback && item.feedback.bookmarked) },
+    feedbackBusy: false,
+    feedbackError: ''
   }
 }
 
@@ -61,6 +64,9 @@ const pageDefinition = {
     historyDetailLoading: false,
     historyDetailError: '',
     historyDetailEmpty: false,
+    readErrorDate: '',
+    readBusyDate: '',
+    feedbackBusyId: '',
     contractNotice: '每日简报功能正在逐步开放。'
   },
 
@@ -69,6 +75,7 @@ const pageDefinition = {
     this.todaySeq = 0
     this.historySeq = 0
     this.historyDetailSeq = 0
+    this.readingSnapshots = new Set()
     this.loadToday()
   },
 
@@ -108,9 +115,10 @@ const pageDefinition = {
       const items = raw && Array.isArray(raw.items) ? raw.items.map(presentDigestItem).filter(Boolean) : []
       const jobItems = raw && Array.isArray(raw.jobItems) ? raw.jobItems.map(presentDigestJob).filter(Boolean) : []
       const digest = raw && typeof raw.localDate === 'string'
-        ? { localDate: formatDate(raw.localDate), generatedAt: typeof raw.generatedAt === 'string' ? raw.generatedAt : '' }
+        ? { localDate: formatDate(raw.localDate), localDateRaw: raw.localDate, snapshotToken: typeof raw.snapshotToken === 'string' ? raw.snapshotToken : '', generatedAt: typeof raw.generatedAt === 'string' ? raw.generatedAt : '', readAt: typeof raw.readAt === 'string' ? raw.readAt : '' }
         : null
-      this.setData({ digest, items, jobItems, empty: !digest || items.length + jobItems.length === 0, loading: false, error: '' })
+      this.setData({ digest, items, jobItems, empty: !digest || items.length + jobItems.length === 0, loading: false, error: '', readErrorDate: '' })
+      if (digest && digest.snapshotToken && Object.prototype.hasOwnProperty.call(raw, 'readAt') && !digest.readAt) this.markDigestRead(raw.localDate, 'today', digest.snapshotToken)
     } catch (error) {
       if (!this.alive || seq !== this.todaySeq) return
       this.setData({ loading: false, error: (error && error.message) || '暂时无法加载今日简报' })
@@ -176,9 +184,15 @@ const pageDefinition = {
       const items = raw && Array.isArray(raw.items) ? raw.items.map(presentDigestItem).filter(Boolean) : []
       const jobItems = raw && Array.isArray(raw.jobItems) ? raw.jobItems.map(presentDigestJob).filter(Boolean) : []
       const digest = raw && raw.localDate === localDate
-        ? { localDate: formatDate(raw.localDate), generatedAt: typeof raw.generatedAt === 'string' ? raw.generatedAt : '' }
+        ? { localDate: formatDate(raw.localDate), snapshotToken: typeof raw.snapshotToken === 'string' ? raw.snapshotToken : '', generatedAt: typeof raw.generatedAt === 'string' ? raw.generatedAt : '' }
         : null
-      this.setData({ historyDigest: digest, historyItems: items, historyJobItems: jobItems, historyDetailEmpty: !digest || items.length + jobItems.length === 0, historyDetailLoading: false, historyDetailError: '' })
+      if (digest) {
+        digest.localDateRaw = raw.localDate
+        digest.snapshotToken = typeof raw.snapshotToken === 'string' ? raw.snapshotToken : ''
+        digest.readAt = typeof raw.readAt === 'string' ? raw.readAt : ''
+      }
+      this.setData({ historyDigest: digest, historyItems: items, historyJobItems: jobItems, historyDetailEmpty: !digest || items.length + jobItems.length === 0, historyDetailLoading: false, historyDetailError: '', readErrorDate: '' })
+      if (digest && digest.snapshotToken && Object.prototype.hasOwnProperty.call(raw, 'readAt') && !digest.readAt) this.markDigestRead(localDate, 'history', digest.snapshotToken)
     } catch (error) {
       if (!this.alive || seq !== this.historyDetailSeq || this.data.historyLocalDate !== localDate) return
       this.setData({ historyDetailLoading: false, historyDetailError: (error && error.message) || '暂时无法加载这一天的简报' })
@@ -201,6 +215,64 @@ const pageDefinition = {
     return this.loadHistoryDate(this.data.historyLocalDate)
   },
 
+  async markDigestRead (localDate, context, snapshotToken) {
+    if (!this.alive || typeof localDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(localDate) ||
+      typeof snapshotToken !== 'string' || !/^[a-f0-9]{64}$/.test(snapshotToken) || this.readingSnapshots.has(snapshotToken)) return
+    this.readingSnapshots.add(snapshotToken)
+    const currentDigest = () => context === 'today' ? this.data.digest : this.data.historyDigest
+    const isCurrentView = () => this.alive && this.data.tab === context &&
+      (context === 'today' || this.data.historyLocalDate === localDate) &&
+      currentDigest() && currentDigest().localDateRaw === localDate && currentDigest().snapshotToken === snapshotToken
+    if (isCurrentView()) this.setData({ readBusyDate: localDate, readErrorDate: '' })
+    try {
+      const result = await api('intelMarkDigestRead', { localDate, snapshotToken })
+      if (!this.alive) return
+      if (!result || typeof result.readAt !== 'string' || !Number.isFinite(Date.parse(result.readAt))) throw new Error('read_stamp_missing')
+      const readAt = result.readAt
+      const histories = this.data.histories.map(row => row.localDate === localDate && row.snapshotToken === snapshotToken ? Object.assign({}, row, { readAt }) : row)
+      const digest = this.data.digest && this.data.digest.localDateRaw === localDate && this.data.digest.snapshotToken === snapshotToken ? Object.assign({}, this.data.digest, { readAt }) : this.data.digest
+      const historyDigest = this.data.historyDigest && this.data.historyDigest.localDateRaw === localDate && this.data.historyDigest.snapshotToken === snapshotToken ? Object.assign({}, this.data.historyDigest, { readAt }) : this.data.historyDigest
+      this.setData({ histories, digest, historyDigest, readBusyDate: this.data.readBusyDate === localDate && isCurrentView() ? '' : this.data.readBusyDate, readErrorDate: this.data.readErrorDate === localDate && isCurrentView() ? '' : this.data.readErrorDate })
+    } catch (_) {
+      if (this.alive && isCurrentView()) this.setData({ readBusyDate: this.data.readBusyDate === localDate ? '' : this.data.readBusyDate, readErrorDate: localDate })
+    } finally {
+      this.readingSnapshots.delete(snapshotToken)
+      if (this.alive && this.data.readBusyDate === localDate && isCurrentView()) this.setData({ readBusyDate: '' })
+    }
+  },
+
+  onRetryMarkRead () {
+    const context = this.data.tab === 'history' ? 'history' : 'today'
+    const digest = context === 'history' ? this.data.historyDigest : this.data.digest
+    const localDate = digest && digest.localDateRaw
+    if (localDate && digest && digest.snapshotToken) return this.markDigestRead(localDate, context, digest.snapshotToken)
+  },
+
+  async onToggleBookmark (event) {
+    const itemId = event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.id
+    const context = event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.context
+    if (!['today', 'history'].includes(context) || typeof itemId !== 'string' ||
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(itemId) || this.data.feedbackBusyId) return
+    const collection = context === 'history' ? 'historyItems' : 'items'
+    const previous = this.data[collection].find(item => item.itemId === itemId)
+    if (!previous) return
+    const action = previous.feedback.bookmarked ? 'unbookmark' : 'bookmark'
+    this.setData({ feedbackBusyId: itemId, [collection]: this.data[collection].map(item => item.itemId === itemId ? Object.assign({}, item, { feedbackError: '' }) : item) })
+    try {
+      const result = await api('intelFeedback', { itemId, feedbackAction: action })
+      if (!this.alive) return
+      const bookmarked = !!(result && result.state && result.state.bookmarked)
+      const updateList = rows => rows.map(item => item.itemId === itemId
+        ? Object.assign({}, item, { feedback: Object.assign({}, item.feedback, { bookmarked }), feedbackError: '' })
+        : item)
+      this.setData({ items: updateList(this.data.items), historyItems: updateList(this.data.historyItems) })
+    } catch (error) {
+      if (this.alive) this.setData({ [collection]: this.data[collection].map(item => item.itemId === itemId ? Object.assign({}, item, { feedbackError: (error && error.message) || '收藏操作失败，请重试' }) : item) })
+    } finally {
+      if (this.alive) this.setData({ feedbackBusyId: '' })
+    }
+  },
+
   onOpenItem (event) {
     const id = event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.id
     if (typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(id)) return
@@ -217,7 +289,7 @@ const pageDefinition = {
 function normalizeHistoryRows (rows) {
   if (!Array.isArray(rows)) return []
   return rows.filter(row => row && typeof row.localDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(row.localDate))
-    .map(row => ({ localDate: row.localDate, dateLabel: formatDate(row.localDate), itemCount: Number.isInteger(row.itemCount) && row.itemCount >= 0 ? row.itemCount : 0, generatedAt: typeof row.generatedAt === 'string' ? row.generatedAt : '' }))
+    .map(row => ({ localDate: row.localDate, dateLabel: formatDate(row.localDate), itemCount: Number.isInteger(row.itemCount) && row.itemCount >= 0 ? row.itemCount : 0, generatedAt: typeof row.generatedAt === 'string' ? row.generatedAt : '', readAt: typeof row.readAt === 'string' ? row.readAt : '', snapshotToken: typeof row.snapshotToken === 'string' ? row.snapshotToken : '' }))
 }
 
 Page(pageDefinition)

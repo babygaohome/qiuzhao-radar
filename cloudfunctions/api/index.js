@@ -909,7 +909,7 @@ handlers.exportMine = async (ev, openid) => {
     .filter(x => (x.generation || 0) === activeGeneration)
     .map(x => ({ itemId: x.itemId, state: x.state || {}, reason: x.reason || '', updatedAt: x.updatedAt || '' }))
   const intelDigestResult = await db.collection('intel_digests').where({ openid }).limit(1000).get()
-  const intelDigests = (intelDigestResult.data || []).map(x => Object.fromEntries(['localDate', 'timezone', 'algorithmVersion', 'itemIds', 'jobCompanyIds', 'generatedAt', 'status'].filter(k => x[k] !== undefined).map(k => [k, x[k]])))
+  const intelDigests = (intelDigestResult.data || []).map(x => Object.fromEntries(['localDate', 'timezone', 'algorithmVersion', 'itemIds', 'jobCompanyIds', 'generatedAt', 'status', 'readAt'].filter(k => x[k] !== undefined).map(k => [k, x[k]])))
   const companies = (await db.collection('companies').where({ source: 'manual', owner: openid }).limit(1000).get()).data
     .map(c => ({ id: c._id, company: c.company, industry: c.industry, ctype: c.ctype, batch: c.batch, openDate: c.openDate,
       deadline: c.deadline, rolling: !c.deadline && c.deadlineText === '招满即止', url: c.url, note: c.note, cities: c.cities, exam: c.exam }))

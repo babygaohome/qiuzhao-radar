@@ -142,9 +142,17 @@ async function test () {
   assert.equal(last.ok, true)
   assert.equal((await h.call('A', 'intelFeedback', { itemId: 'article-rate', feedbackAction: 'like' })).error, 'intelFeedback_limit')
 
+  h.table('intel_digests').set('digest-a', {
+    _id: 'digest-a', openid: 'A', localDate: '2026-10-29', timezone: 'Asia/Shanghai',
+    algorithmVersion: 'm4-test', itemIds: ['item-a'], jobCompanyIds: ['company-a'],
+    generatedAt: '2026-10-29T01:00:00.000Z', status: 'ready', readAt: '2026-10-29T02:00:00.000Z',
+    generation: 0, digestGeneration: 2
+  })
   const exported = await h.call('A', 'exportMine')
   assert.equal(exported.intel.preferences.topics.ai, 0.7)
   assert.equal(exported.intel.feedback.length, 2)
+  assert.equal(exported.intel.digests[0].readAt, '2026-10-29T02:00:00.000Z', 'digest read state is included in personal export')
+  assert.equal(Object.hasOwn(exported.intel.digests[0], 'digestGeneration'), false, 'internal digest generation is not exported')
   assert.equal(JSON.stringify(exported.intel).includes('B'), false)
 
   // Competing preference writes with the same revision: exactly one can commit.

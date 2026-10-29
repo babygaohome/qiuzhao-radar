@@ -217,8 +217,117 @@ async function run () {
   open.onOpenItem({ currentTarget: { dataset: { id: 'news:1' } } })
   assert.deepEqual(detail, ['/pages/detail/detail?id=company-1', '/pages/intel-detail/detail?id=news%3A1'])
 
+  const interactionCalls = []
+  const interactions = makePage((action, data) => {
+    const req = deferred()
+    interactionCalls.push({ action, data, ...req })
+    return req.promise
+  })
+  interactions.onLoad()
+  assert.equal(interactionCalls[0].action, 'intelDigestToday')
+  const oldSnapshotToken = 'a'.repeat(64)
+  const newSnapshotToken = 'b'.repeat(64)
+  interactionCalls[0].resolve({ digest: { localDate: '2026-10-29', snapshotToken: oldSnapshotToken, readAt: null, items: [{ itemId: 'read-1', title: '可收藏', sourceName: '公开来源', feedback: { bookmarked: false } }] } })
+  await tick()
+  assert.equal(interactionCalls[1].action, 'intelMarkDigestRead')
+  assert.deepEqual(plain(interactionCalls[1].data), { localDate: '2026-10-29', snapshotToken: oldSnapshotToken })
+  assert.equal(interactions.data.readBusyDate, '2026-10-29')
+  interactions.data.histories = [{ localDate: '2026-10-29', itemCount: 1, readAt: '', snapshotToken: newSnapshotToken }]
+  interactions.data.historyItems = [{ itemId: 'read-1', title: '可收藏', sourceName: '公开来源', feedback: { bookmarked: false }, feedbackError: '' }]
+
+  // Refresh returns a new same-day snapshot while the old read marker remains in flight.
+  interactions.loadToday()
+  assert.equal(interactionCalls[2].action, 'intelDigestToday')
+  interactionCalls[2].resolve({ digest: { localDate: '2026-10-29', snapshotToken: newSnapshotToken, readAt: null, items: [{ itemId: 'read-1', title: '可收藏', sourceName: '公开来源', feedback: { bookmarked: false } }] } })
+  await tick()
+  assert.equal(interactionCalls[3].action, 'intelMarkDigestRead')
+  assert.deepEqual(plain(interactionCalls[3].data), { localDate: '2026-10-29', snapshotToken: newSnapshotToken })
+  interactions.markDigestRead('2026-10-29', 'today', newSnapshotToken)
+  await tick()
+  assert.equal(interactionCalls.filter(call => call.action === 'intelMarkDigestRead').length, 2, 'same token in-flight marking is de-duplicated')
+  interactionCalls[1].resolve({ readAt: '2026-10-29T00:10:00.000Z' })
+  await tick()
+  assert.equal(interactions.data.digest.snapshotToken, newSnapshotToken)
+  assert.equal(interactions.data.digest.readAt, '', 'late old-snapshot response cannot mark the refreshed same-day snapshot as read')
+  interactionCalls[3].resolve({ readAt: '2026-10-29T00:13:00.000Z' })
+  await tick()
+  assert.equal(interactions.data.digest.readAt, '2026-10-29T00:13:00.000Z')
+  assert.equal(interactions.data.histories[0].readAt, '2026-10-29T00:13:00.000Z')
+
+  const itemCall = { currentTarget: { dataset: { id: 'read-1', context: 'today' } } }
+  interactions.onToggleBookmark(itemCall)
+  assert.equal(interactionCalls[4].action, 'intelFeedback')
+  assert.deepEqual(plain(interactionCalls[4].data), { itemId: 'read-1', feedbackAction: 'bookmark' })
+  interactionCalls[4].reject({ message: 'bookmark failed' })
+  await tick()
+  assert.equal(interactions.data.items[0].feedback.bookmarked, false, 'failed bookmark preserves prior state')
+  assert.equal(interactions.data.items[0].feedbackError, 'bookmark failed')
+  interactions.onToggleBookmark(itemCall)
+  assert.equal(interactionCalls[5].data.feedbackAction, 'bookmark', 'retry repeats the failed requested action')
+  interactionCalls[5].resolve({ ok: true, state: { bookmarked: true } })
+  await tick()
+  assert.equal(interactions.data.items[0].feedback.bookmarked, true)
+  assert.equal(interactions.data.historyItems[0].feedback.bookmarked, true, 'bookmark state stays in sync across both cached views')
+  interactions.onToggleBookmark(itemCall)
+  assert.equal(interactionCalls[6].data.feedbackAction, 'unbookmark', 'saved item can be removed')
+  interactionCalls[6].resolve({ ok: true, state: { bookmarked: false } })
+  await tick()
+  assert.equal(interactions.data.items[0].feedback.bookmarked, false)
+  assert.equal(interactions.data.historyItems[0].feedback.bookmarked, false, 'unbookmark state stays in sync across both cached views')
+
+  const failedReadCalls = []
+  const failedRead = makePage((action, data) => { const req = deferred(); failedReadCalls.push({ action, data, ...req }); return req.promise })
+  failedRead.onLoad()
+  failedReadCalls[0].resolve({ digest: { localDate: '2026-10-29', snapshotToken: 'c'.repeat(64), readAt: null, items: [] } }); await tick()
+  failedReadCalls[1].reject({ message: 'write failed' }); await tick()
+  assert.equal(failedRead.data.digest.readAt, '', 'failed marking never appears as read')
+  assert.equal(failedRead.data.readErrorDate, '2026-10-29', 'read error offers a retry')
+  failedRead.onRetryMarkRead()
+  assert.deepEqual(plain(failedReadCalls[2].data), { localDate: '2026-10-29', snapshotToken: 'c'.repeat(64) })
+  failedReadCalls[2].resolve({ readAt: '2026-10-29T00:14:00.000Z' }); await tick()
+  assert.equal(failedRead.data.digest.readAt, '2026-10-29T00:14:00.000Z')
+
+  const historyReadCalls = []
+  const historyRead = makePage((action, data) => { const req = deferred(); historyReadCalls.push({ action, data, ...req }); return req.promise })
+  historyRead.onLoad(); historyReadCalls[0].resolve({ digest: { localDate: '2026-10-29', snapshotToken: 'd'.repeat(64), readAt: '2026-10-29T00:00:00.000Z', items: [] } }); await tick()
+  historyRead.onSelectTab({ currentTarget: { dataset: { tab: 'history' } } })
+  historyReadCalls[1].resolve({ digests: [{ localDate: '2026-10-28', itemCount: 1, readAt: '', snapshotToken: 'e'.repeat(64) }] }); await tick()
+  assert.equal(historyRead.data.histories[0].readAt, '')
+  historyRead.onOpenHistoryDate({ currentTarget: { dataset: { date: '2026-10-28' } } })
+  historyReadCalls[2].resolve({ digest: { localDate: '2026-10-28', snapshotToken: 'e'.repeat(64), readAt: null, items: [] } }); await tick()
+  assert.equal(historyReadCalls[3].action, 'intelMarkDigestRead', 'opening a real unread archived digest marks it read')
+  assert.deepEqual(plain(historyReadCalls[3].data), { localDate: '2026-10-28', snapshotToken: 'e'.repeat(64) })
+  historyReadCalls[3].resolve({ readAt: '2026-10-29T00:11:00.000Z' }); await tick()
+  assert.equal(historyRead.data.historyDigest.readAt, '2026-10-29T00:11:00.000Z')
+
+  const todayRetryCalls = []
+  const todayRetry = makePage((action, data) => { const req = deferred(); todayRetryCalls.push({ action, data, ...req }); return req.promise })
+  todayRetry.alive = true
+  todayRetry.readingSnapshots = new Set()
+  todayRetry.data.tab = 'today'
+  todayRetry.data.historyLocalDate = '2026-10-28'
+  todayRetry.data.historyDigest = { localDateRaw: '2026-10-28', snapshotToken: 'f'.repeat(64) }
+  todayRetry.data.digest = { localDateRaw: '2026-10-29', snapshotToken: '9'.repeat(64), readAt: '' }
+  todayRetry.data.readErrorDate = '2026-10-29'
+  todayRetry.onRetryMarkRead()
+  assert.equal(todayRetryCalls[0].action, 'intelMarkDigestRead')
+  assert.deepEqual(plain(todayRetryCalls[0].data), { localDate: '2026-10-29', snapshotToken: '9'.repeat(64) }, 'today retry ignores stale history selection')
+  todayRetryCalls[0].resolve({ readAt: '2026-10-29T00:15:00.000Z' }); await tick()
+  assert.equal(todayRetry.data.digest.readAt, '2026-10-29T00:15:00.000Z')
+
+  const unloadBookmarkCalls = []
+  const unloadBookmark = makePage((action, data) => { const req = deferred(); unloadBookmarkCalls.push({ action, data, ...req }); return req.promise })
+  unloadBookmark.data.items = [{ itemId: 'bookmark-unload', title: 'Saved item', sourceName: 'Source', feedback: { bookmarked: false }, feedbackError: '' }]
+  unloadBookmark.onToggleBookmark({ currentTarget: { dataset: { id: 'bookmark-unload', context: 'today' } } })
+  assert.equal(unloadBookmarkCalls[0].data.feedbackAction, 'bookmark')
+  unloadBookmark.onUnload()
+  unloadBookmarkCalls[0].resolve({ ok: true, state: { bookmarked: true } }); await tick()
+  assert.equal(unloadBookmark.data.items[0].feedback.bookmarked, false, 'late bookmark result cannot mutate a page after unload')
+
   const markup = fs.readFileSync(path.join(root, 'miniprogram/pages/intel-digest/index.wxml'), 'utf8')
   assert.doesNotMatch(markup, /微信通知|邮件推送|示例资讯|学历符合/)
+  assert.match(markup, /intelMarkDigestRead|onRetryMarkRead/)
+  assert.match(markup, /catchtap="onToggleBookmark"/, 'bookmark controls do not bubble into article navigation')
   const app = JSON.parse(fs.readFileSync(path.join(root, 'miniprogram/app.json'), 'utf8'))
   assert.equal(app.pages.includes('pages/intel-digest/index'), true, 'digest page is registered')
 

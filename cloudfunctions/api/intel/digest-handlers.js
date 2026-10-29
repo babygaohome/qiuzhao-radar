@@ -147,14 +147,17 @@ function createDigestHandlers ({ db, now = () => Date.now(), loadJobItems } = {}
       throw fail('server_error', 'digest job snapshot invalid')
     }
     const items = await loadPublicItems(db, record.itemIds)
+    const feedbackItems = await addBookmarkState(db, openid, state.generation, items)
     const jobItems = record.jobCompanyIds.length
       ? await readSnapshotJobs(loadJobItems, openid, record.jobCompanyIds)
       : []
     return { digest: {
       localDate,
-      items,
+      snapshotToken: id,
+      items: feedbackItems,
       jobItems,
-      generatedAt: record.generatedAt
+      generatedAt: record.generatedAt,
+      readAt: typeof record.readAt === 'string' && validTimestamp(record.readAt) !== null ? record.readAt : null
     } }
   }
 
@@ -176,7 +179,7 @@ function createDigestHandlers ({ db, now = () => Date.now(), loadJobItems } = {}
     }
     if (cursor !== null) query.localDate = db.command.lt(cursor)
     const result = await db.collection('intel_digests').where(query)
-      .field({ _id: true, openid: true, localDate: true, timezone: true, generation: true, digestGeneration: true, status: true, itemIds: true, jobCompanyIds: true, generatedAt: true })
+      .field({ _id: true, openid: true, localDate: true, timezone: true, generation: true, digestGeneration: true, status: true, itemIds: true, jobCompanyIds: true, generatedAt: true, readAt: true })
       .orderBy('localDate', 'desc').limit(limit + 1).get()
     if (!isRecord(result) || !Array.isArray(result.data)) throw fail('server_error', 'digest history unavailable')
     const rows = result.data
@@ -185,7 +188,63 @@ function createDigestHandlers ({ db, now = () => Date.now(), loadJobItems } = {}
     return { digests: page, nextCursor: digests.length > limit && page.length ? page[page.length - 1].localDate : null }
   }
 
-  return { intelDigestToday, intelDigestByDate, intelDigestHistory }
+  async function intelMarkDigestRead (event, openid) {
+    validateIdentity(openid)
+    if (!isRecord(event) || !isValidLocalDate(event.localDate) || typeof event.snapshotToken !== 'string') throw fail('bad_request', 'digest snapshot token invalid')
+    if (typeof db.runTransaction !== 'function') throw fail('server_error', 'digest read state unavailable')
+    const markedAt = now()
+    if (!Number.isFinite(markedAt)) throw fail('server_error', 'digest clock unavailable')
+    return db.runTransaction(async tx => {
+      const pref = await readOptionalDocument(tx, 'intel_preferences', openid)
+      if (!pref || pref.deleted === true || pref.dailyDigestEnabled !== true) return { error: 'feature_disabled', message: '每日简报暂未开放' }
+      const state = currentState(pref, pref.timezone)
+      const today = localDateAt(markedAt, state.timeZone)
+      if (event.localDate > today) throw fail('bad_request', 'future digest date invalid')
+      const id = digestId(openid, event.localDate, state.generation, state.digestGeneration, state.timeZone)
+      if (event.snapshotToken !== id) throw fail('stale_digest', 'digest snapshot changed')
+      const snapshot = await readOptionalDocument(tx, 'intel_digests', id)
+      if (!snapshot) return { error: 'not_found', message: '简报不存在' }
+      if (snapshot._id !== id || snapshot.openid !== openid || snapshot.localDate !== event.localDate ||
+        snapshot.status !== 'ready' || snapshot.generation !== state.generation ||
+        snapshot.digestGeneration !== state.digestGeneration || snapshot.timezone !== state.timeZone) {
+        return { error: 'not_found', message: '简报不存在' }
+      }
+      if (typeof snapshot.readAt === 'string' && validTimestamp(snapshot.readAt) !== null) {
+        return { ok: true, readAt: snapshot.readAt }
+      }
+      const readAt = new Date(markedAt).toISOString()
+      const result = await tx.collection('intel_digests').doc(id).update({ data: { readAt } })
+      if (!result || !result.stats || !result.stats.updated) throw fail('server_error', 'digest read state unavailable')
+      return { ok: true, readAt }
+    })
+  }
+
+  return { intelDigestToday, intelDigestByDate, intelDigestHistory, intelMarkDigestRead }
+}
+
+async function addBookmarkState (db, openid, generation, items) {
+  if (!items.length) return []
+  if (!db.command || typeof db.command.in !== 'function') throw fail('server_error', 'digest feedback unavailable')
+  const itemIds = items.map(item => item.itemId)
+  const feedbackIds = itemIds.map(itemId => feedbackId(openid, itemId, generation))
+  const result = await db.collection('intel_feedback')
+    .where({ _id: db.command.in(feedbackIds), openid, generation })
+    .field({ _id: true, openid: true, itemId: true, generation: true, state: true })
+    .limit(itemIds.length)
+    .get()
+  if (!isRecord(result) || !Array.isArray(result.data)) throw fail('server_error', 'digest feedback unavailable')
+  const states = new Map()
+  for (const row of result.data) {
+    if (!isRecord(row) || row.openid !== openid || row.generation !== generation ||
+      !itemIds.includes(row.itemId) || row._id !== feedbackId(openid, row.itemId, generation) || !isRecord(row.state)) continue
+    states.set(row.itemId, { bookmarked: row.state.bookmarked === true })
+  }
+  return items.map(item => Object.assign({}, item, { feedback: states.get(item.itemId) || { bookmarked: false } }))
+}
+
+function feedbackId (openid, itemId, generation) {
+  const scope = generation ? openid + '\0' + generation + '\0' + itemId : openid + '\0' + itemId
+  return require('crypto').createHash('sha256').update(scope).digest('hex')
 }
 
 function historySummary (row, openid, state) {
@@ -201,8 +260,10 @@ function historySummary (row, openid, state) {
   }
   return {
     localDate: row.localDate,
+    snapshotToken: row._id,
     itemCount: row.itemIds.length + row.jobCompanyIds.length,
-    generatedAt: row.generatedAt
+    generatedAt: row.generatedAt,
+    readAt: typeof row.readAt === 'string' && validTimestamp(row.readAt) !== null ? row.readAt : null
   }
 }
 
@@ -237,13 +298,14 @@ async function readSnapshotJobs (loadJobItems, openid, companyIds) {
 function createDigestFeatureHandlers ({ db, enabled, now, loadJobItems } = {}) {
   if (enabled !== true) {
     const disabled = async () => ({ error: 'feature_disabled', message: '每日简报暂未开放' })
-    return { intelDigestToday: disabled, intelDigestByDate: disabled, intelDigestHistory: disabled }
+    return { intelDigestToday: disabled, intelDigestByDate: disabled, intelDigestHistory: disabled, intelMarkDigestRead: disabled }
   }
   const handlers = createDigestHandlers({ db, now, loadJobItems })
   return {
     intelDigestToday: (event, serverOpenid) => handlers.intelDigestToday(event, serverOpenid),
     intelDigestByDate: (event, serverOpenid) => handlers.intelDigestByDate(event, serverOpenid),
-    intelDigestHistory: (event, serverOpenid) => handlers.intelDigestHistory(event, serverOpenid)
+    intelDigestHistory: (event, serverOpenid) => handlers.intelDigestHistory(event, serverOpenid),
+    intelMarkDigestRead: (event, serverOpenid) => handlers.intelMarkDigestRead(event, serverOpenid)
   }
 }
 
