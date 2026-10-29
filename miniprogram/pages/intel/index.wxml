@@ -5,7 +5,7 @@
     <view class="intel-subtitle">AI、半导体与电子产业公开信息</view>
     <view wx:if="{{digestAtLabel}}" class="intel-updated">{{digestAtLabel}}</view>
     <view class="intel-settings-link" bindtap="onOpenPreferences">兴趣与简报设置 ›</view>
-    <view wx:if="{{digestEnabled}}" class="intel-settings-link" bindtap="onOpenDigest">每日简报 ›</view>
+    <view wx:if="{{digestEnabled}}" class="intel-settings-link intel-digest-link" bindtap="onOpenDigest">每日简报 ›</view>
   </view>
 
   <view wx:if="{{demo}}" class="intel-notice intel-notice-demo">演示内容 · 非真实资讯</view>

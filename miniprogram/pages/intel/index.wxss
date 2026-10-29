@@ -6,6 +6,7 @@
 .intel-subtitle { position: relative; z-index: 1; margin-top: 8rpx; color: var(--muted); font-size: 23rpx; line-height: 1.5; }
 .intel-updated { position: relative; z-index: 1; margin-top: 18rpx; color: var(--muted); font-size: 20rpx; }
 .intel-settings-link { position: relative; z-index: 1; display: inline-block; margin-top: 18rpx; color: var(--accent); font-size: 22rpx; font-weight: 650; }
+.intel-digest-link { margin-left: 18rpx; }
 .intel-notice { margin-top: 18rpx; padding: 18rpx 20rpx; border: 1rpx solid var(--line); border-radius: 16rpx; background: var(--surface); color: var(--muted); font-size: 23rpx; }
 .intel-notice-demo { color: var(--accent); background: var(--accent-soft); border-color: transparent; font-weight: 650; }
 .intel-filters { white-space: nowrap; margin: 24rpx -4rpx 18rpx; }

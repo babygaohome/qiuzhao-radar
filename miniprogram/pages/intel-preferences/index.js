@@ -15,6 +15,7 @@ const DEFAULTS = { topics: {}, subtopics: [], blockedTopics: [], languages: ['zh
 Page({
   data: {
     loading: true, saving: false, error: '', saved: false, loaded: false, revision: 0, blockedTopics: [],
+    digestReady: config.intelDigestEnabled === true,
     topicChoices: TOPICS.map(item => Object.assign({}, item, { selected: false })),
     subtopicChoices: SUBTOPICS.map(item => Object.assign({}, item, { selected: false })),
     languageZh: true, languageEn: true, timezone: DEFAULTS.timezone, digestLocalTime: DEFAULTS.digestLocalTime,
