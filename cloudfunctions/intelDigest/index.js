@@ -8,7 +8,7 @@ const INTERNAL_USER = Symbol('trusted_scheduler_user')
 function validTimerEnvelope (event, runtimeEnv, wxContext) {
   if (!runtimeEnv || runtimeEnv.TRIGGER_SRC !== 'timer') return false
   if (!isTrustedRuntimeContext(runtimeEnv) || !isTrustedRuntimeContext(wxContext)) return false
-  return !!(event && typeof event === 'object' && event.Type === 'timer' &&
+  return !!(event && typeof event === 'object' && typeof event.Type === 'string' && event.Type.toLowerCase() === 'timer' &&
     event.TriggerName === TRIGGER_NAME && typeof event.Time === 'string' &&
     Number.isFinite(Date.parse(event.Time)))
 }

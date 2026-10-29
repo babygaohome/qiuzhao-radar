@@ -42,6 +42,9 @@ async function main () {
   })
 
   assert.equal(validTimerEnvelope(timer(), { TRIGGER_SRC: 'timer' }, { SOURCE: 'scf' }), true)
+  assert.equal(validTimerEnvelope({ ...timer(), Type: 'Timer' }, { TRIGGER_SRC: 'timer' }, { SOURCE: 'wx_trigger' }), true, 'timer event casing is normalized like the existing crawler')
+  assert.equal(validTimerEnvelope({ ...timer(), Type: 1 }, { TRIGGER_SRC: 'timer' }, { SOURCE: 'scf' }), false, 'non-string event types are rejected')
+  assert.equal(validTimerEnvelope({ ...timer(), Type: 'request' }, { TRIGGER_SRC: 'timer' }, { SOURCE: 'scf' }), false, 'non-timer event types are rejected')
   assert.equal(validTimerEnvelope({ ...timer(), source: 'timer' }, {}, {}), false, 'event cannot create a trusted runtime marker')
   assert.equal(validTimerEnvelope(timer(), { TRIGGER_SRC: 'timer' }, { OPENID: 'person', SOURCE: 'wx_devtools' }), false)
   assert.equal(validTimerEnvelope(timer(), { TRIGGER_SRC: 'timer' }, { SOURCE: 'tcbgw' }), false)
