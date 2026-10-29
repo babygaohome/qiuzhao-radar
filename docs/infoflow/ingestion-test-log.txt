@@ -1,0 +1,118 @@
+security/catalog-audit.test.cjs: exit 0
+✔ inventory snapshots all actual title sources, excludes private/non-public rows, and repeated start preserves work (23.254875ms)
+✔ extractors do not use notes and drop known reseller links (0.87025ms)
+✔ inventory uses at most four concurrent durable inserts and retries a failed batch without skipping a company (10.035459ms)
+✔ JSON-LD requires exact employer and exact role; tracks cohort and current open status separately (0.949708ms)
+✔ verify checks every title and writes an isolated catalogAudit field while preserving manual review (1.89075ms)
+✔ matching JSON-LD without an explicit official-host mapping is evidence, not verification (0.786958ms)
+✔ search quota remains unresolved and does not turn a search snippet into evidence (0.735125ms)
+✔ a known reposting site is filtered before fetching and cannot verify a role (0.558875ms)
+✔ active lock prevents concurrent inventory and initial pass never claims full completion with unresolved work (0.70175ms)
+✔ inventory failure leaves cursor unchanged so the same page is retried safely (0.41825ms)
+✔ company catalog write failure stays write_pending and retries idempotently (0.859667ms)
+✔ default verify call inventories a bounded page and verifies available companies before inventory completes (30.460458ms)
+✔ queue state cannot count as verified before its company patch is confirmed (0.162ms)
+✔ changed company titles remain a conflict instead of verifying an obsolete snapshot (0.814041ms)
+✔ browser job evidence survives background parsing and is published only after application (1.022875ms)
+✔ a crawler title change between evidence read and write cannot publish a verified company (0.638458ms)
+ℹ tests 16
+ℹ suites 0
+ℹ pass 16
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 78.887792
+
+security/catalog-corrections.test.cjs: exit 0
+PASS correction snapshot ordering, conditional/idempotent application, visibility and title conflicts, conservative state and failure reporting
+
+security/catalog-quality.test.cjs: exit 0
+✔ checks only actual title fields and leaves the input arrays untouched (2.096375ms)
+✔ does not flag concrete job titles that include recruitment-year wording (0.8745ms)
+✔ flags an overall campus recruitment announcement but not a concrete role headline (0.539292ms)
+✔ does not infer a missing title from note and skips private or non-public records (0.074083ms)
+✔ caps issue output and does not claim existence, freshness, or verification (0.306ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8.285167
+
+security/client-catalog-policy.test.cjs: exit 0
+client catalog policy tests passed (6 groups)
+
+security/crawler-refresh.test.cjs: exit 0
+✔ crawler trigger schedules a check every thirty minutes, including overnight (0.825958ms)
+✔ a source cursor advances only when every planned request succeeds (0.770958ms)
+✔ successful empty pages count as successful fetches; a failed fetch does not (0.075166ms)
+✔ metadata copied from a database record drops the reserved document id (0.064125ms)
+✔ database write pool stays within the configured concurrency bound (1.793125ms)
+{"at":"2026-10-29T01:29:10.381Z","fetched":{"niuqi":0,"qiuzhaowang":0,"givemeoc":0,"offerstar":0,"jobup":0,"hust":0},"pages":{"qiuzhaowang":[1,5,6,7],"givemeoc":[1,9,10,11,12,13],"jobup":[1,7],"hust":[1,4],"niuqiDeep":"electronicscircuitsemiconductor"},"companies":0,"added":0,"addedBySource":{},"updated":0,"skippedStale":0,"auditConflicts":0,"removed":0,"links":0,"ms":11,"sources":{"qiuzhaowang":{"status":"ok","requests":4,"planned":4,"ms":1},"givemeoc":{"status":"ok","requests":6,"planned":6,"ms":0},"niuqi":{"status":"ok","requests":8,"planned":8,"ms":0},"offerstar":{"status":"ok","requests":1,"planned":1,"ms":0},"jobup":{"status":"ok","requests":2,"planned":2,"ms":0},"hust":{"status":"ok","requests":2,"planned":2,"ms":0}},"status":"ok"}
+✔ main lifecycle records a successful crawl and advances completed source cursors (12.973375ms)
+{"at":"2026-10-29T01:29:10.385Z","fetched":{"niuqi":0,"qiuzhaowang":0,"givemeoc":0,"offerstar":0,"jobup":0,"hust":0},"pages":{"qiuzhaowang":[1,5,6,7],"givemeoc":[1,9,10,11,12,13],"jobup":[1,7],"hust":[1,4],"niuqiDeep":"electronicscircuitsemiconductor"},"companies":0,"added":0,"addedBySource":{},"updated":0,"skippedStale":0,"auditConflicts":0,"removed":0,"links":0,"ms":3,"sources":{"qiuzhaowang":{"status":"failed","requests":1,"planned":4,"ms":0},"givemeoc":{"status":"failed","requests":1,"planned":6,"ms":0},"niuqi":{"status":"failed","requests":2,"planned":8,"ms":0},"offerstar":{"status":"failed","requests":1,"planned":1,"ms":0},"jobup":{"status":"failed","requests":1,"planned":2,"ms":0},"hust":{"status":"failed","requests":1,"planned":2,"ms":0}},"status":"error"}
+✔ all-source failure preserves last success and cursors and does not refresh catalog metadata (2.889625ms)
+✔ write-pool failure waits for in-flight writes before rejecting (5.903042ms)
+✔ changed empty maps use explicit replacement instead of an empty SDK update (0.120291ms)
+ℹ tests 9
+ℹ suites 0
+ℹ pass 9
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 28.451375
+
+security/detail-review.test.cjs: exit 0
+PASS real detail-page load uses review-aware status without asserting unverified recruitment is ongoing
+
+security/discovery.test.cjs: exit 0
+PASS discovery validation and end-to-end staged import, external host exclusion, deduplication
+
+security/home-loading.test.cjs: exit 0
+home loading tests passed (8 scenarios)
+
+security/infoflow-pages.test.cjs: exit 0
+InfoFlow page pagination, race cancellation, flags, retries and labels: PASS
+
+security/infoflow.test.cjs: exit 0
+InfoFlow contract, API route identity/default flag, page events/races/errors: PASS
+
+security/intel-ingestion.test.cjs: exit 0
+✔ ordinary invocation and event flags cannot enable cloud ingestion (1.400125ms)
+✔ exact host and path are required and caller supplied URLs are rejected (0.486583ms)
+✔ redirects are rejected and oversized body is aborted (0.546208ms)
+✔ normalization preserves metadata and makes absent publish dates visibly unknown (1.0985ms)
+✔ retries transient failures, deduplicates ids, isolates failed sources, and checkpoints only after writes (1003.109209ms)
+✔ failed writes preserve older items and do not advance checkpoint (0.661208ms)
+✔ lease conflicts do not start fetching and release runs after errors (0.286083ms)
+✔ rate limiting defers all sources and malformed links are skipped (0.415334ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1012.135375
+
+security/isolation.test.cjs: exit 0
+PASS 249 assertions: user isolation, authorization, encrypted/chunked backup, evidence, quotas and crawler regressions
+
+security/loading-api.test.cjs: exit 0
+PASS fast-list query isolation, owner-aware summaries, auth and sanitized sync health
+
+security/manual-review.test.cjs: exit 0
+PASS manual review snapshot, timer access, immutable before image, plan allowlist, idempotent patch, verified/leads/query, AI exclusion and card evidence
+
+security/public-jobs.test.cjs: exit 0
+PASS staged public-table import, graduation separation, deduplication
+
+security/web-access.test.cjs: exit 0
+PASS trusted caller binding, request-only flow, identity isolation, origin allowlist, single-UID approval race safety, idempotence and DB error handling
+
+security/web-entrypoint.test.cjs: exit 0
+PASS integrated auth entrypoint: trusted runtime UID, event spoof rejection, safe diagnostics, web approval, timer protection, WeChat continuity and fail-closed SDK errors
