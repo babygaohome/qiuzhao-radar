@@ -98,6 +98,33 @@ let passed = 0
 function check (value, message) { assert.ok(value, message); passed++ }
 async function run () {
   const h = harness()
+  // Match wx-server-sdk's DocumentReference.get() missing-record error for M3.
+  // Keep this adaptation scoped to its two user-data collections so unrelated
+  // test cases retain the generic in-memory harness behavior.
+  const rawCollection = h.db.collection.bind(h.db)
+  h.db.collection = name => {
+    const collection = rawCollection(name)
+    if (!['intel_preferences', 'intel_feedback'].includes(name)) return collection
+    return new Proxy(collection, { get (target, key) {
+      if (key === 'doc') return id => {
+        const doc = target.doc(id)
+        return new Proxy(doc, { get (document, method) {
+          if (method === 'get') return async () => {
+            try { return await document.get() } catch (error) {
+              if (error && error.message === 'not found') {
+                throw Object.assign(new Error(`document.get:fail document with _id ${id} does not exist`), { errCode: -1 })
+              }
+              throw error
+            }
+          }
+          const value = Reflect.get(document, method)
+          return typeof value === 'function' ? value.bind(document) : value
+        } })
+      }
+      const value = Reflect.get(target, key)
+      return typeof value === 'function' ? value.bind(target) : value
+    } })
+  }
   const put = (col, id, d) => h.table(col).set(id, { ...clone(d), _id: id })
   put('companies', 'public', { company: '公共企业', source: 'auto', v: 'official', dl: '9999-12-31', deadline: '2026-12-31' })
   put('companies', 'govOnly', { company:'公开招聘测试公司',source:'auto',v:'official',publicOnly:true,positions:['交付工程师'],note:'交付工程师',dl:'9999-12-31',deadline:'',seen:'9999-12-31',publicJobs:[{title:'交付工程师',qualifications:'本科及以上，3年工作经验'}],publicSource:{fairDate:'9999-12-31',published:'2026-10-01'} })
