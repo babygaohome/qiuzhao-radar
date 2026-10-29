@@ -1,0 +1,10 @@
+{
+  "name": "intelDigest",
+  "version": "1.0.0",
+  "description": "Server-only in-app daily digest scheduler",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "3.17.2",
+    "wx-server-sdk": "4.0.2"
+  }
+}

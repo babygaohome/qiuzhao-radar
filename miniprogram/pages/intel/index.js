@@ -36,7 +36,7 @@ function filteredDemo (category) {
 Page({
   data: {
     items: [], loading: false, loadingMore: false, error: '', moreError: '',
-    enabled: false, demo: false, nextCursor: null, digestAtLabel: '', windowNotice: '', feedbackBusyId: '', cursorConflict: false, refreshing: false,
+    enabled: false, demo: false, digestEnabled: false, nextCursor: null, digestAtLabel: '', windowNotice: '', feedbackBusyId: '', cursorConflict: false, refreshing: false,
     filters: [
       { key: 'all', label: '全部' }, { key: 'ai', label: 'AI' },
       { key: 'semiconductor', label: '半导体' }, { key: 'electronics', label: '电子' }
@@ -48,7 +48,7 @@ Page({
     this.alive = true
     const demo = config.intelDemoMode === true
     const enabled = config.intelEnabled === true
-    this.setData({ demo, enabled, items: demo ? filteredDemo(this.data.category) : [] })
+    this.setData({ demo, enabled, digestEnabled: config.intelDigestEnabled === true, items: demo ? filteredDemo(this.data.category) : [] })
   },
 
   onShow () {
@@ -151,6 +151,11 @@ Page({
   },
 
   onOpenPreferences () { wx.navigateTo({ url: '/pages/intel-preferences/index' }) },
+
+  onOpenDigest () {
+    if (!this.data.digestEnabled) return
+    wx.navigateTo({ url: '/pages/intel-digest/index' })
+  },
 
   async onFeedback (event) {
     const id = event.currentTarget.dataset.id

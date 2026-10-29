@@ -7,5 +7,7 @@ module.exports = {
   // The page calls the live API by default. The cloud API stays fail-closed until
   // INTEL_ENABLED and the collection are configured; feature_disabled is shown kindly.
   intelEnabled: true,
-  intelDemoMode: false
+  intelDemoMode: false,
+  // Daily digest stays hidden until the read APIs and scheduler are deployed.
+  intelDigestEnabled: false
 }

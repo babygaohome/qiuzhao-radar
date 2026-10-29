@@ -4,6 +4,7 @@
     "pages/mine/mine",
     "pages/ai/ai",
     "pages/intel/index",
+    "pages/intel-digest/index",
     "pages/intel-detail/detail",
     "pages/intel-preferences/index",
     "pages/detail/detail",

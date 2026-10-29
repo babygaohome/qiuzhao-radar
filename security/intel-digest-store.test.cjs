@@ -18,7 +18,7 @@ function fakeDb (initial = {}) {
       doc (id) {
         return {
           async get () { maybeFail('get'); if (!rows.has(id)) throw sdkMissingDocument(id); return { data: structuredClone(rows.get(id)) } },
-          async set ({ data }) { maybeFail('set'); rows.set(id, structuredClone(data)); return { stats: { updated: 1 } } }
+          async set ({ data }) { maybeFail('set'); assert.equal(Object.hasOwn(data, '_id'), false, 'document.set payload must not modify the database primary key'); rows.set(id, structuredClone({ ...data, _id: id })); return { stats: { updated: 1 } } }
         }
       },
       where (query) {
@@ -57,7 +57,7 @@ async function testIdempotencyAndIsolation () {
   assert.deepEqual(await store.getMine({ openid: 'bob', localDate: '2026-10-29' }), null)
   assert.equal(await store.getMine({ openid: 'alice', localDate: '2026-10-29' }).then(x => x.openid), undefined, 'public view omits openid')
   assert.equal(db.tables.get('intel_digests').size, 1)
-  assert.notEqual(digestId('alice', '2026-10-29', 2, 0), digestId('bob', '2026-10-29', 2, 0))
+  assert.notEqual(digestId('alice', '2026-10-29', 2, 0, 'Asia/Shanghai'), digestId('bob', '2026-10-29', 2, 0, 'Asia/Shanghai'))
 }
 
 async function testGenerationAndDisabled () {
@@ -83,8 +83,8 @@ async function testPostCommitFence () {
       changed = true
       db.set('intel_preferences', 'alice', { ...basePreference, generation: 2, digestGeneration: 1, deleted: false })
       // Model a rapid re-enable and same-date save before the old writer's post-commit fence.
-      db.set('intel_digests', digestId('alice', '2026-10-29', 2, 1), {
-        _id: digestId('alice', '2026-10-29', 2, 1), openid: 'alice', localDate: '2026-10-29',
+      db.set('intel_digests', digestId('alice', '2026-10-29', 2, 1, 'Asia/Shanghai'), {
+        _id: digestId('alice', '2026-10-29', 2, 1, 'Asia/Shanghai'), openid: 'alice', localDate: '2026-10-29',
         timezone: 'Asia/Shanghai', generation: 2, digestGeneration: 1, itemIds: ['new-generation-item'], jobCompanyIds: [], status: 'ready'
       })
     }
@@ -92,7 +92,7 @@ async function testPostCommitFence () {
   }
   const store = createSnapshotStore({ db })
   await assert.rejects(store.saveIfAbsent({ openid: 'alice', localDate: '2026-10-29', timezone: 'Asia/Shanghai', generation: 2, digestGeneration: 0, snapshot: baseSnapshot }), e => ['stale_generation', 'stale_digest_generation', 'digest_disabled'].includes(e.code))
-  assert.deepEqual(db.tables.get('intel_digests').get(digestId('alice', '2026-10-29', 2, 1)).itemIds, ['new-generation-item'], 'cleanup of a stale generation must preserve a new post-delete snapshot')
+  assert.deepEqual(db.tables.get('intel_digests').get(digestId('alice', '2026-10-29', 2, 1, 'Asia/Shanghai')).itemIds, ['new-generation-item'], 'cleanup of a stale generation must preserve a new post-delete snapshot')
 }
 
 async function testWhitelistAndFailures () {
@@ -109,13 +109,13 @@ async function testWhitelistAndFailures () {
 
 
 async function testGenerationScopedReadAndTimezone () {
-  const oldId = digestId('alice', '2026-10-29', 2, 0)
-  const currentId = digestId('alice', '2026-10-29', 3, 0)
+  const oldId = digestId('alice', '2026-10-29', 2, 0, 'Asia/Shanghai')
+  const currentId = digestId('alice', '2026-10-29', 3, 0, 'Asia/Shanghai')
   const db = fakeDb({
     intel_preferences: { alice: { ...basePreference, generation: 3 } },
     intel_digests: {
-      [oldId]: { _id: oldId, openid: 'alice', localDate: '2026-10-29', generation: 2, digestGeneration: 0, itemIds: ['old'] },
-      [currentId]: { _id: currentId, openid: 'alice', localDate: '2026-10-29', generation: 3, digestGeneration: 0, itemIds: ['current'] }
+      [oldId]: { _id: oldId, openid: 'alice', localDate: '2026-10-29', timezone: 'Asia/Shanghai', generation: 2, digestGeneration: 0, itemIds: ['old'] },
+      [currentId]: { _id: currentId, openid: 'alice', localDate: '2026-10-29', timezone: 'Asia/Shanghai', generation: 3, digestGeneration: 0, itemIds: ['current'] }
     }
   })
   const store = createSnapshotStore({ db })
@@ -127,7 +127,7 @@ async function testGenerationScopedReadAndTimezone () {
 }
 
 async function testTransientPreferenceReadDoesNotDeleteSnapshot () {
-  const id = digestId('alice', '2026-10-29', 2, 0)
+  const id = digestId('alice', '2026-10-29', 2, 0, 'Asia/Shanghai')
   const existing = { _id: id, openid: 'alice', localDate: '2026-10-29', timezone: 'Asia/Shanghai', generation: 2, digestGeneration: 0, itemIds: ['keep'], jobCompanyIds: [], status: 'ready' }
   const db = fakeDb({ intel_preferences: { alice: basePreference }, intel_digests: { [id]: existing } })
   const baseTransaction = db.runTransaction.bind(db)
@@ -164,7 +164,7 @@ async function testTransientPreferenceReadDoesNotDeleteSnapshot () {
 
 
 async function testExistingSnapshotSurvivesTimezoneRace () {
-  const id = digestId('alice', '2026-10-29', 2, 0)
+  const id = digestId('alice', '2026-10-29', 2, 0, 'Asia/Shanghai')
   const existing = { _id: id, openid: 'alice', localDate: '2026-10-29', timezone: 'Asia/Shanghai', generation: 2, digestGeneration: 0, itemIds: ['keep'], jobCompanyIds: [], status: 'ready' }
   const db = fakeDb({ intel_preferences: { alice: basePreference }, intel_digests: { [id]: existing } })
   const originalTransaction = db.runTransaction.bind(db)
@@ -180,12 +180,30 @@ async function testExistingSnapshotSurvivesTimezoneRace () {
 }
 
 
+
+async function testTimezoneChangeAndSwitchBack () {
+  const generation = 2
+  const digestGeneration = 0
+  const oldId = digestId('alice', '2026-10-29', generation, digestGeneration, 'Asia/Shanghai')
+  const newId = digestId('alice', '2026-10-29', generation, digestGeneration, 'UTC')
+  const db = fakeDb({ intel_preferences: { alice: basePreference } })
+  const store = createSnapshotStore({ db })
+  await store.saveIfAbsent({ openid: 'alice', localDate: '2026-10-29', timezone: 'Asia/Shanghai', generation, digestGeneration, snapshot: baseSnapshot })
+  db.set('intel_preferences', 'alice', { ...basePreference, timezone: 'UTC' })
+  assert.equal(await store.getMine({ openid: 'alice', localDate: '2026-10-29' }), null, 'timezone switch does not expose old-zone snapshot')
+  await store.saveIfAbsent({ openid: 'alice', localDate: '2026-10-29', timezone: 'UTC', generation, digestGeneration, snapshot: { ...baseSnapshot, timezone: 'UTC', itemIds: ['utc-item'] } })
+  assert.notEqual(oldId, newId, 'timezone is included in snapshot identity')
+  db.set('intel_preferences', 'alice', { ...basePreference, timezone: 'Asia/Shanghai' })
+  assert.deepEqual((await store.getMine({ openid: 'alice', localDate: '2026-10-29' })).itemIds, ['item-a'], 'switching back finds the original stable snapshot')
+  assert.equal(db.tables.get('intel_digests').size, 2)
+}
+
 async function testDigestGenerationRejectsQuickReenable () {
   const db = fakeDb({ intel_preferences: { alice: { ...basePreference, dailyDigestEnabled: true, digestGeneration: 2 } } })
   const store = createSnapshotStore({ db })
   await assert.rejects(store.saveIfAbsent({ openid: 'alice', localDate: '2026-10-29', timezone: 'Asia/Shanghai', generation: 2, digestGeneration: 1, snapshot: baseSnapshot }), e => e.code === 'stale_digest_generation')
   assert.equal(db.tables.get('intel_digests'), undefined)
-  const id = digestId('alice', '2026-10-29', 2, 2)
+  const id = digestId('alice', '2026-10-29', 2, 2, 'Asia/Shanghai')
   db.set('intel_digests', id, { _id: id, openid: 'alice', localDate: '2026-10-29', generation: 2, digestGeneration: 2, timezone: 'Asia/Shanghai', itemIds: ['fresh'], jobCompanyIds: [], status: 'ready' })
   assert.deepEqual((await store.getMine({ openid: 'alice', localDate: '2026-10-29' })).itemIds, ['fresh'])
 }
@@ -195,6 +213,7 @@ async function run () {
   await testGenerationAndDisabled()
   await testGenerationScopedReadAndTimezone()
   await testDigestGenerationRejectsQuickReenable()
+  await testTimezoneChangeAndSwitchBack()
   await testTransientPreferenceReadDoesNotDeleteSnapshot()
   await testExistingSnapshotSurvivesTimezoneRace()
   await testPostCommitFence()

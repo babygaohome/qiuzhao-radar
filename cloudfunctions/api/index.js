@@ -26,6 +26,7 @@ const auditCoverage = require('./audit-coverage')
 const catalogQuality = require('./catalog-quality')
 const intel = require('./intel/handlers')
 const intelPreferences = require('./intel/preferences')
+const { createDigestFeatureHandlers } = require('./intel/digest-handlers')
 const { readOptionalDocument, markIntelDeleted } = intelPreferences
 // User paused the full-catalog review on 2026-10-22. Keep existing results.
 const CATALOG_AUDIT_PAUSED = true
@@ -212,6 +213,10 @@ Object.assign(handlers, intel.createIntelHandlers({
 Object.assign(handlers, intelPreferences.createPreferenceHandlers({
   db,
   takeLimit: (openid, kind, limit) => takeQuota(openid, kind, limit, kind === 'intelFeedback' ? '情报反馈' : '情报设置')
+}))
+Object.assign(handlers, createDigestFeatureHandlers({
+  db,
+  enabled: process.env.INTEL_DIGEST_ENABLED === 'true'
 }))
 handlers.publicJobsStatus = async () => {
   const record=await readDoc('meta','publicJobsLast')

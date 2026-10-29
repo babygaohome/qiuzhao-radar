@@ -1,7 +1,6 @@
 'use strict'
 
 const crypto = require('crypto')
-const { readOptionalDocument } = require('../api/intel/preferences')
 
 const TOPICS = new Set(['jobs', 'ai', 'semiconductor', 'electronics', 'explore'])
 const ITEM_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
@@ -10,10 +9,25 @@ const SNAPSHOT_FIELDS = new Set(['localDate', 'timezone', 'algorithmVersion', 'i
 
 function fail (code, message) { return Object.assign(new Error(message), { code }) }
 
-function digestId (openid, localDate, generation, digestGeneration) {
+async function readOptionalDocument (db, collection, id) {
+  try {
+    const result = await db.collection(collection).doc(id).get()
+    return result && result.data || null
+  } catch (error) {
+    const message = String(error && (error.message || error.errMsg || error))
+    if (/permission|denied|collection.*(?:not exist|not found)|database collection not exist/i.test(message)) throw error
+    const code = error && (error.errCode !== undefined ? error.errCode : error.code)
+    if (code === 'DATABASE_DOCUMENT_NOT_EXIST' || (code === -1 && /document with _id .+ does not exist/i.test(message))) return null
+    throw error
+  }
+}
+
+function digestId (openid, localDate, generation, digestGeneration, timezone) {
   if (!Number.isSafeInteger(generation) || generation < 0) throw fail('bad_request', 'generation invalid')
   if (!Number.isSafeInteger(digestGeneration) || digestGeneration < 0) throw fail('bad_request', 'digest generation invalid')
-  return crypto.createHash('sha256').update(`${openid}\0${localDate}\0${generation}\0${digestGeneration}`).digest('hex')
+  if (typeof timezone !== 'string' || !timezone || timezone.length > 64) throw fail('bad_request', 'timezone invalid')
+  try { new Intl.DateTimeFormat('en', { timeZone: timezone }) } catch (_) { throw fail('bad_request', 'timezone invalid') }
+  return crypto.createHash('sha256').update(`${openid}\0${localDate}\0${generation}\0${digestGeneration}\0${timezone}`).digest('hex')
 }
 
 function validateSnapshot (value, openid, localDate, timezone, generation, digestGeneration) {
@@ -30,7 +44,7 @@ function validateSnapshot (value, openid, localDate, timezone, generation, diges
   if (!Array.isArray(jobCompanyIds) || jobCompanyIds.length > 12 || jobCompanyIds.some(id => typeof id !== 'string' || !COMPANY_ID.test(id))) throw fail('bad_request', 'digest jobs invalid')
   if (itemIds.length + jobCompanyIds.length > 12) throw fail('bad_request', 'digest exceeds item limit')
   return {
-    _id: digestId(openid, localDate, generation, digestGeneration), openid, localDate, timezone,
+    _id: digestId(openid, localDate, generation, digestGeneration, timezone), openid, localDate, timezone,
     algorithmVersion: value.algorithmVersion || 'v1',
     itemIds: [...new Set(itemIds)], jobCompanyIds: [...new Set(jobCompanyIds)],
     generatedAt: value.generatedAt || new Date().toISOString(),
@@ -66,10 +80,12 @@ function createSnapshotStore ({ db, now = () => new Date().toISOString() } = {})
       const pref = await readOptionalDocument(tx, 'intel_preferences', openid)
       if (!pref || pref.deleted === true || pref.dailyDigestEnabled !== true) throw fail('digest_disabled', 'digest is disabled for this user')
       const generation = Number.isSafeInteger(pref.generation) ? pref.generation : 0
+      const timezone = pref.timezone
+      if (typeof timezone !== 'string' || !timezone) throw fail('bad_request', 'timezone invalid')
       const digestGeneration = Number.isSafeInteger(pref.digestGeneration) ? pref.digestGeneration : 0
-      const id = digestId(openid, localDate, generation, digestGeneration)
+      const id = digestId(openid, localDate, generation, digestGeneration, timezone)
       const record = await readOptionalDocument(tx, 'intel_digests', id)
-      if (!record || record.openid !== openid || record.localDate !== localDate || record.generation !== generation || record.digestGeneration !== digestGeneration) return null
+      if (!record || record.openid !== openid || record.localDate !== localDate || record.generation !== generation || record.digestGeneration !== digestGeneration || record.timezone !== timezone) return null
       return safeView(record)
     })
   }
@@ -81,17 +97,19 @@ function createSnapshotStore ({ db, now = () => new Date().toISOString() } = {})
     if (!Number.isSafeInteger(generation) || generation < 0) throw fail('bad_request', 'generation invalid')
     if (!Number.isSafeInteger(digestGeneration) || digestGeneration < 0) throw fail('bad_request', 'digest generation invalid')
     const record = validateSnapshot(snapshot, openid, localDate, timezone, generation, digestGeneration)
+    const recordId = record._id
+    delete record._id
 
     const transactionResult = await db.runTransaction(async tx => {
       const pref = await currentPreference(tx, openid, generation, digestGeneration)
       if (pref.timezone !== timezone) throw fail('stale_timezone', 'digest timezone changed')
-      const old = await readOptionalDocument(tx, 'intel_digests', record._id)
+      const old = await readOptionalDocument(tx, 'intel_digests', recordId)
       if (old) {
         if (old.openid !== openid || old.localDate !== localDate) throw fail('digest_collision', 'digest identity mismatch')
         return { created: false, record: safeView(old) }
       }
       record.generatedAt = snapshot.generatedAt || now()
-      await tx.collection('intel_digests').doc(record._id).set({ data: record })
+      await tx.collection('intel_digests').doc(recordId).set({ data: record })
       return { created: true, record: safeView(record) }
     })
 
@@ -104,7 +122,7 @@ function createSnapshotStore ({ db, now = () => new Date().toISOString() } = {})
     } catch (error) {
       if (transactionResult.created && error && ['digest_disabled', 'stale_generation', 'stale_digest_generation', 'stale_timezone'].includes(error.code)) {
         await db.collection('intel_digests').where({
-          _id: record._id, openid, generation, digestGeneration
+          _id: recordId, openid, generation, digestGeneration
         }).remove()
       }
       throw error
