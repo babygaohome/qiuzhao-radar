@@ -12,9 +12,10 @@ const get = (o, key) => key.split('.').reduce((v, k) => v && v[k], o)
 function matchValue (v, q) {
   if (!q || !q.__op) return v === q
   const x = q.value
+  const equal = (a, b) => a === b || (a !== undefined && b !== undefined && typeof a === 'object' && typeof b === 'object' && JSON.stringify(a) === JSON.stringify(b))
   switch (q.__op) {
-    case 'eq': return v === x
-    case 'neq': return v !== x
+    case 'eq': return equal(v, x)
+    case 'neq': return !equal(v, x)
     case 'exists': return (v !== undefined) === x
     case 'in': return x.includes(v)
     case 'nin': return !x.includes(v)
@@ -326,7 +327,7 @@ async function run () {
   put('companies', 'evidence', { company: '星河科技有限公司', agg: 'https://campus.niuqizp.com/schedule-abc123.html', hasOrig: true, origUrl: 'https://old.example.com' })
   await audit.enrichFromSource(h.table('companies').get('evidence'))
   check(!h.table('companies').get('evidence').hasOrig && !h.table('companies').get('evidence').origUrl, 'unrelated linked page counted as official')
-  const cb = { exports: {}, require: n => n === 'wx-server-sdk' ? h.sdk : require(n), console, process, Buffer, URL, setTimeout }
+  const cb = { exports: {}, require: n => n === 'wx-server-sdk' ? h.sdk : n.startsWith('.') ? require(path.resolve(root, 'cloudfunctions/crawler', n)) : require(n), console, process, Buffer, URL, setTimeout }
   vm.createContext(cb); vm.runInContext(fs.readFileSync(path.join(root, 'cloudfunctions/crawler/index.js'), 'utf8'), cb)
   const old = { company: '示例企业', source: 'auto', srcs: ['牛企直聘'], posBySrc: { 牛企直聘: ['交付工程师'] }, fullJobs: ['交付工程师'], positions: ['交付工程师'], note: '交付工程师', batch: '2027届校招', deadline: '2026-12-01', dlBySrc: { 牛企直聘: '2026-12-01' }, cities: '北京' }
   const next = cb.exports._test.mergeInto(old, 'demo', [{ company: '示例企业', src: '牛企直聘', positions: '', batch: '2027届校招', deadline: '2026-12-01', cities: '上海', updated: '2026-09-27', past: false }])

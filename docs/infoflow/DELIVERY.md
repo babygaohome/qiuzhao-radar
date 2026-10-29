@@ -50,7 +50,7 @@ These are recommendations only; this PR creates none of them.
 3. Restore `intelDemoMode: false` before packaging. In this state the page displays the disabled message and makes no API call.
 4. The cloud action requires a separate explicit `INTEL_ENABLED=true`; do not set it in production for this fixture-only delivery.
 
-No WeChat Developer Tools screenshot was captured in this environment. A screenshot must be taken in Developer Tools after these steps; a browser mock is not represented as a real mini-program screenshot.
+Real Developer Tools screenshots are now available: [list](wechat-list.png) and [detail](wechat-detail.png).
 
 ## Rollback
 
@@ -60,8 +60,8 @@ For a deployed follow-up, leave/unset `INTEL_ENABLED` and restore `intelEnabled:
 
 Actual command results, including pre-change failures and post-change regression results, are recorded in `test-log.txt`. This is local fixture/mocked verification only. CloudBase identity integration, deployed environment flags, real WeChat account isolation, Developer Tools rendering, dark-mode device rendering, and any production configuration were not verified.
 
-## Final reviewer verification (follow-up)
+## Final reviewer verification
 
-Primary reviewer executed all 16 security scripts: 14 pass, isolation and manual-review fail. See final-test-log.txt. New signed-pagination and page-behavior tests pass. Existing test fixtures were updated to current per-role audit rules, without changing production recruitment logic. A legal-company-name enrichment assertion and stale source-label assertions still fail; these are not claimed resolved. No screenshot, real Developer Tools compilation, or cloud verification has been completed.
+All 16 security scripts rerun independently: exit 0. See final-test-log.txt. The isolation harness now compares query array values structurally and resolves crawler relative dependencies correctly. The complete legal company name fixture remains intact. Manual review assertions match current generic provenance labels; production policy was not weakened or changed.
 
-Frontend now handles append/deduplication, retry, refresh/category races, unload cancellation, localized metadata, and explicit disabled/empty/error states with namespaced light/dark styling. Feature flags remain disabled. Backend remains fixture-only; no live ingestion or daily digest is delivered.
+Actual UI: WeChat Developer Tools 2.02.2609231 RC on macOS, HUAWEI Pura 80 Pro simulator, WeChatLib 3.17.3. Imported a separate preview copy with intelDemoMode=true, intel page first, and cloud initialization disabled. Initial 3.17.6 simulator launch failed; switching the preview private setting to the existing project's 3.17.3 and recompiling succeeded. Observed zero console errors and preload/hot-reload warnings. List renders, card opens detail, back returns to list, semiconductor filter selects one correct demo card, all restores both. Screenshots are from the actual simulator, using labeled synthetic data. No live API, dark-mode device run, deployment, or cloud identity validation is claimed. Shipped flags remain off.
