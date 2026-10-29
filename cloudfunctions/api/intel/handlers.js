@@ -8,6 +8,31 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
 const CURSOR_VERSION = 1
 const CURSOR_TTL_MS = 15 * 60 * 1000
 const CURSOR_SECRET_ENV = 'INFOFLOW_CURSOR_SECRET'
+const READ_WINDOW = 300
+const READ_BATCH = 100
+
+// Read a deterministic, bounded window from the crawler's shared collection.
+// The caller cannot supply a selector; only published records are queried.
+function createReadItems (db) {
+  if (!db || typeof db.collection !== 'function') throw new TypeError('database_required')
+  return async function readItems () {
+    const rows = []
+    for (let skip = 0; skip < READ_WINDOW; skip += READ_BATCH) {
+      const result = await db.collection('intel_items')
+        .where({ status: 'published' })
+        .field({ _id: true, category: true, title: true, summaryZh: true, summaryStatus: true, publishedAt: true, sourceName: true, sourceKind: true, version: true, originalUrl: true, evidenceLinks: true, status: true })
+        .orderBy('_id', 'asc')
+        .skip(skip)
+        .limit(Math.min(READ_BATCH, READ_WINDOW - skip))
+        .get()
+      const batch = result && Array.isArray(result.data) ? result.data : []
+      rows.push(...batch.map(row => Object.assign({}, row, { id: row._id })).filter(row => typeof row._id === 'string'))
+      if (batch.length < READ_BATCH) break
+    }
+    rows.windowLimited = rows.length === READ_WINDOW
+    return rows
+  }
+}
 
 function failure (error, message) { return { error, message } }
 function isRecord (value) { return !!value && typeof value === 'object' && !Array.isArray(value) }
@@ -56,15 +81,20 @@ function createIntelHandlers (options) {
     if (event.cursor !== undefined && event.cursor !== null && event.cursor !== '' && !secret) return failure('bad_request', '分页游标无效或已过期')
 
     let rows
+    let windowLimited = false
     try {
       const source = await readItems()
       if (!Array.isArray(source)) return failure('server_error', '资讯暂不可用')
+      windowLimited = source.windowLimited === true
       rows = source.filter(row => row && row.status === 'published' && (category === 'all' || row.category === category))
         .filter(row => typeof row.id === 'string' && ID.test(row.id))
         .sort(compareItems)
     } catch (_) { return failure('server_error', '资讯暂不可用') }
 
-    const snapshot = crypto.createHash('sha256').update(JSON.stringify(rows)).digest('hex')
+    // Cursor snapshots cover only fields returned to clients. Crawler metadata such as
+    // fetchedAt changes on every refresh and must not invalidate an otherwise stable page.
+    const snapshotRows = rows.map(publicItem)
+    const snapshot = crypto.createHash('sha256').update(JSON.stringify(snapshotRows)).digest('hex')
     const owner = userHash(openid)
     let offset = 0
     if (event.cursor !== undefined && event.cursor !== null && event.cursor !== '') {
@@ -77,14 +107,14 @@ function createIntelHandlers (options) {
       } catch (_) { return failure('bad_request', '分页游标无效或已过期') }
     }
 
-    const page = rows.slice(offset, offset + limit).map(publicItem)
+    const page = snapshotRows.slice(offset, offset + limit)
     const nextOffset = offset + page.length
     let nextCursor = null
     if (nextOffset < rows.length) {
       if (!secret || secret.length < 32) return failure('server_error', '分页暂不可用')
       nextCursor = encodeCursor({ v: CURSOR_VERSION, u: owner, c: category, s: snapshot, l: limit, o: nextOffset, e: now() + CURSOR_TTL_MS }, secret)
     }
-    return { items: page, nextCursor, digestAt: null }
+    return { items: page, nextCursor, digestAt: null, windowLimited }
   }
 
   async function intelItem (event, openid) {
@@ -129,7 +159,7 @@ function safeSourceUrl (value) {
 function publicItem (item) {
   const out = { id: item.id }
   if (ITEM_CATEGORIES.has(item.category)) out.category = item.category
-  for (const [key, max] of [['title', 300], ['summaryZh', 2000], ['summaryStatus', 40], ['publishedAt', 64], ['sourceName', 200]]) {
+  for (const [key, max] of [['title', 300], ['summaryZh', 2000], ['summaryStatus', 40], ['publishedAt', 64], ['sourceName', 200], ['sourceKind', 64], ['version', 120]]) {
     const value = safeText(item[key], max)
     if (value !== undefined) out[key] = value
   }
@@ -141,4 +171,4 @@ function publicItem (item) {
   return out
 }
 
-module.exports = { createIntelHandlers, CATEGORIES: [...CATEGORIES], ID, publicItem }
+module.exports = { createIntelHandlers, createReadItems, READ_WINDOW, CATEGORIES: [...CATEGORIES], ID, publicItem }

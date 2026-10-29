@@ -11,6 +11,7 @@ const HOST = 'api.github.com'
 const MAX_BODY = 1024 * 1024
 const MAX_RETRIES = 2
 const REQUEST_TIMEOUT_MS = 8000
+const MAX_ITEMS_PER_SOURCE = 30
 
 function releaseUrl (source) { return `https://${HOST}/repos/${source.owner}/${source.repo}/releases?per_page=30` }
 
@@ -67,6 +68,8 @@ async function runIngestion ({ fetchJson = requestJson, store, clock = () => new
   const results = []
   let deferredUntil = 0
   try {
+    const startedAt = clock().toISOString()
+    if (store.createRun) await store.createRun(token, { status: 'running', startedAt, sources: [] })
     let requestedSource = false
     for (const source of sources.slice(0, 2)) {
       const result = { sourceId: source.id, status: 'failed', fetched: 0, addedOrUpdated: 0 }
@@ -85,28 +88,41 @@ async function runIngestion ({ fetchJson = requestJson, store, clock = () => new
         }
         if (!Array.isArray(payload)) throw Object.assign(new Error('invalid_payload'), { code: 'invalid_payload' })
         const checkpoint = await store.getCheckpoint(source.id)
-        const page = payload.slice(0, 30)
+        const page = payload.slice(0, MAX_ITEMS_PER_SOURCE)
         const fetchedAt = clock().toISOString()
         for (const release of page) {
           const item = normalize(source, release, fetchedAt)
-          if (item) { await store.upsert(item); result.addedOrUpdated++ }
+          if (item) { await store.upsert(item, token); result.addedOrUpdated++ }
         }
         await store.setCheckpoint(source.id, { page: 1, completedAt: fetchedAt, previousCompletedAt: checkpoint && checkpoint.completedAt || null }, token)
         result.fetched = page.length; result.status = 'success'
-      } catch (error) { result.error = error.code || 'source_failed' }
+      } catch (error) { result.error = safeError(error) }
       results.push(result)
     }
-    return { status: results.every(r => r.status === 'success') ? 'success' : 'partial', sources: results }
+    const output = { status: results.every(r => r.status === 'success') ? 'success' : 'partial', sources: results }
+    if (store.updateRun) await store.updateRun(token, { status: output.status, finishedAt: clock().toISOString(), sources: results })
+    return output
+  } catch (error) {
+    if (store.updateRun) await store.updateRun(token, { status: 'failed', finishedAt: clock().toISOString(), error: safeError(error), sources: results }).catch(() => {})
+    throw error
   } finally { await store.releaseLease(token) }
 }
 
-class MemoryStore {
-  constructor () { this.items = new Map(); this.checkpoints = new Map(); this.lease = null }
-  async acquireLease (token) { if (this.lease) return false; this.lease = token; return true }
-  async releaseLease (token) { if (this.lease === token) this.lease = null }
-  async upsert (item) { this.items.set(item._id, item) }
-  async getCheckpoint (sourceId) { return this.checkpoints.get(sourceId) || null }
-  async setCheckpoint (sourceId, checkpoint, token) { if (this.lease !== token) throw new Error('lease_lost'); this.checkpoints.set(sourceId, checkpoint) }
+function safeError (error) {
+  const allowed = ['lease_lost', 'source_not_allowed', 'invalid_url', 'url_not_allowed', 'request_timeout', 'http_error', 'rate_limited', 'response_too_large', 'redirect_rejected', 'invalid_json', 'invalid_payload', 'write_failed']
+  return error && allowed.includes(error.code) ? error.code : 'ingestion_failed'
 }
 
-module.exports = { SOURCES, MAX_BODY, validateUrl, requestJson, normalize, runIngestion, MemoryStore, _test: { releaseUrl } }
+class MemoryStore {
+  constructor ({ now = Date.now, leaseMs = 300000 } = {}) { this.items = new Map(); this.checkpoints = new Map(); this.runs = new Map(); this.lease = null; this.now = now; this.leaseMs = leaseMs }
+  async acquireLease (token) { if (this.lease && (typeof this.lease !== 'object' || this.lease.expiresAt > this.now())) return false; this.lease = { token, expiresAt: this.now() + this.leaseMs }; return true }
+  assertLease (token) { if (!this.lease || this.lease.token !== token || this.lease.expiresAt <= this.now()) throw Object.assign(new Error('lease_lost'), { code: 'lease_lost' }) }
+  async releaseLease (token) { if (this.lease && this.lease.token === token) this.lease = null }
+  async createRun (token, metadata) { this.assertLease(token); this.runs.set(token, { ...metadata, runId: token }) }
+  async updateRun (token, metadata) { this.assertLease(token); this.runs.set(token, { ...(this.runs.get(token) || {}), ...metadata, runId: token }) }
+  async upsert (item, token) { if (token !== undefined) this.assertLease(token); this.items.set(item._id, item) }
+  async getCheckpoint (sourceId) { return this.checkpoints.get(sourceId) || null }
+  async setCheckpoint (sourceId, checkpoint, token) { this.assertLease(token); this.checkpoints.set(sourceId, checkpoint) }
+}
+
+module.exports = { SOURCES, MAX_BODY, MAX_ITEMS_PER_SOURCE, validateUrl, requestJson, normalize, runIngestion, MemoryStore, _test: { releaseUrl, safeError } }

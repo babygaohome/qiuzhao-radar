@@ -8,6 +8,7 @@
 
   <view wx:if="{{demo}}" class="intel-notice intel-notice-demo">演示内容 · 非真实资讯</view>
   <view wx:elif="{{!enabled}}" class="intel-notice">情报功能暂未开启</view>
+  <view wx:if="{{windowNotice}}" class="intel-notice">{{windowNotice}}</view>
 
   <block wx:if="{{enabled || demo}}">
     <scroll-view class="intel-filters" scroll-x show-scrollbar="false">
@@ -34,7 +35,8 @@
           <text class="intel-category">{{item.categoryLabel}}</text>
           <text class="intel-source">{{item.displaySource}}</text>
         </view>
-        <view class="intel-card-title">{{item.title || '标题未知'}}</view>
+        <view class="intel-card-title">{{item.displayTitle}}</view>
+        <view class="intel-card-summary">{{item.displayType}}<text wx:if="{{item.version}}"> · {{item.version}}</text></view>
         <view class="intel-card-summary">{{item.displaySummary}}</view>
         <view class="intel-card-footer">
           <text>{{item.displayDate}}</text>
@@ -45,7 +47,7 @@
       <view wx:if="{{loadingMore}}" class="intel-more-state">正在加载更多…</view>
       <view wx:elif="{{moreError}}" class="intel-more-state">{{moreError}} <text class="intel-inline-link" bindtap="onRetryMore">重试</text></view>
       <button wx:elif="{{nextCursor}}" class="intel-more-button" loading="{{loadingMore}}" disabled="{{loadingMore}}" bindtap="loadMore">加载更多</button>
-      <view wx:elif="{{!loading && !nextCursor}}" class="intel-end">已显示全部内容</view>
+      <view wx:elif="{{!loading && !nextCursor}}" class="intel-end">已显示当前读取窗口内的全部内容</view>
     </view>
   </block>
 </view>

@@ -4,6 +4,8 @@ module.exports = {
   // 订阅消息模板 ID：小程序后台 → 功能 → 订阅消息 → 我的模板。留空则不显示提醒按钮
   remindTmplId: '',
   // Both flags are off in shipped builds. Demo rows are synthetic and local only.
-  intelEnabled: false,
+  // The page calls the live API by default. The cloud API stays fail-closed until
+  // INTEL_ENABLED and the collection are configured; feature_disabled is shown kindly.
+  intelEnabled: true,
   intelDemoMode: false
 }

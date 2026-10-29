@@ -14,6 +14,7 @@
       <text class="intel-detail-source">{{item.displaySource}}</text>
     </view>
     <view class="intel-detail-title">{{item.title || '标题未知'}}</view>
+    <view class="intel-detail-date">{{item.displayType}}<text wx:if="{{item.version}}"> · {{item.version}}</text></view>
     <view class="intel-detail-date">{{item.displayDate}}</view>
     <view class="intel-detail-rule"></view>
     <view class="intel-detail-section-title">内容摘要</view>

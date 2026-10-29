@@ -3,19 +3,23 @@ const config = require('../../config.js')
 const demoItems = require('../intel/demo-fixtures.js')
 
 const CATEGORY_LABELS = { jobs: '求职', ai: 'AI', semiconductor: '半导体', electronics: '电子' }
-const STATUS_LABELS = { grounded: '有来源依据', reviewed: '已核对', unknown: '摘要状态未知' }
+const STATUS_LABELS = { grounded: '有来源依据', reviewed: '已核对', unavailable: '未提供中文摘要', unknown: '摘要状态未知' }
+const KIND_LABELS = { open_source_release: '开源项目版本发布', developer_release: '开发工具版本发布' }
 
 function presentItem (item) {
   const date = item && typeof item.publishedAt === 'string' ? new Date(item.publishedAt) : null
   const displayDate = date && !Number.isNaN(date.getTime())
     ? `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`
     : '发布时间未知'
+  const displayType = KIND_LABELS[item && item.sourceKind] || '公开信息条目'
   return Object.assign({}, item, {
     categoryLabel: CATEGORY_LABELS[item && item.category] || '分类未知',
     displayDate,
     displaySource: item && item.sourceName || '来源未知',
-    displaySummary: item && item.summaryZh || '暂无可核实摘要',
+    displaySummary: item && item.summaryZh || '该条目未提供中文摘要，请查看原始发布说明。',
     displaySummaryStatus: STATUS_LABELS[item && item.summaryStatus] || '摘要状态未知',
+    displayType,
+    displayTitle: item && item.title || (item && item.version ? `${displayType} ${item.version}` : '标题未知'),
     displayOriginalUrl: item && typeof item.originalUrl === 'string' && /^https:\/\//i.test(item.originalUrl) ? item.originalUrl : ''
   })
 }
@@ -62,6 +66,10 @@ Page({
       this.setData({ item: result && result.item ? presentItem(result.item) : null, loading: false, error: result && result.item ? '' : '这条资讯暂不可用' })
     } catch (error) {
       if (!this.alive || seq !== this.seq) return
+      if (error && error.code === 'feature_disabled') {
+        this.setData({ enabled: false, item: null, loading: false, error: '情报功能暂未开启' })
+        return
+      }
       this.setData({ loading: false, error: (error && error.message) || '暂时无法加载详情' })
     }
   },

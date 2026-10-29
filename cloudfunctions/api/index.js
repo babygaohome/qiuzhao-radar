@@ -25,7 +25,6 @@ const catalogAuditModule = require('./catalog-audit')
 const auditCoverage = require('./audit-coverage')
 const catalogQuality = require('./catalog-quality')
 const intel = require('./intel/handlers')
-const intelFixtures = require('./intel/fixtures')
 // User paused the full-catalog review on 2026-10-22. Keep existing results.
 const CATALOG_AUDIT_PAUSED = true
 
@@ -201,11 +200,11 @@ async function listSummary (ev, openid, prof) {
 // ---------------------------------------------------------------- 列表与详情
 
 const handlers = {}
-// Fixture-only first delivery. Enable explicitly with INTEL_ENABLED=true after review.
+// Live crawler records remain opt-in until the collection and cursor secret are deployed.
 Object.assign(handlers, intel.createIntelHandlers({
   enabled: process.env.INTEL_ENABLED === 'true',
   cursorSecret: process.env.INFOFLOW_CURSOR_SECRET || '',
-  readItems: () => intelFixtures
+  readItems: intel.createReadItems(db)
 }))
 handlers.publicJobsStatus = async () => {
   const record=await readDoc('meta','publicJobsLast')
