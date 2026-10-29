@@ -9,7 +9,7 @@ function validTimerEnvelope (event, context, env = process.env) {
   // caller-controlled and therefore cannot authorize ingestion.
   if (env.TRIGGER_SRC !== 'timer') return false
   if (!context || context.OPENID || context.UID || context.SOURCE === 'tcbgw') return false
-  return Boolean(event && event.Type === 'timer' && event.TriggerName === TRIGGER_NAME &&
+  return Boolean(event && typeof event.Type === 'string' && event.Type.toLowerCase() === 'timer' && event.TriggerName === TRIGGER_NAME &&
     typeof event.Time === 'string' && Number.isFinite(Date.parse(event.Time)))
 }
 
@@ -21,7 +21,12 @@ exports.main = async function main (event, runtimeContext) {
   cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
   const context = cloud.getWXContext()
   if (context.OPENID || context.UID) return { ok: false, code: 'FORBIDDEN' }
-  if (!validTimerEnvelope(event, context)) return { ok: false, code: 'INVALID_TRIGGER' }
+  // SDK merges trusted invocation context with process environment (concurrent runtimes).
+  const runtimeEnv = require('@cloudbase/node-sdk').getCloudbaseContext(runtimeContext)
+  if (!validTimerEnvelope(event, context, runtimeEnv)) {
+    console.warn(JSON.stringify({ code: 'INVALID_TRIGGER', runtimeTimer: runtimeEnv.TRIGGER_SRC === 'timer', eventTimer: !!(event && typeof event.Type === 'string' && event.Type.toLowerCase() === 'timer'), expectedName: !!(event && event.TriggerName === TRIGGER_NAME), validTime: !!(event && typeof event.Time === 'string' && Number.isFinite(Date.parse(event.Time))) }))
+    return { ok: false, code: 'INVALID_TRIGGER' }
+  }
   const db = cloud.database()
   const store = createCloudBaseStore(db)
   const now = new Date().toISOString()
