@@ -850,7 +850,8 @@ handlers.deleteAllMine = async (ev, openid) => {
   const deletion = await markIntelDeleted(db, openid, _, () => new Date().toISOString())
   await db.collection('intel_feedback').where({ openid, generation: _.lt(deletion.generation) }).remove()
   await db.collection('intel_feedback').where({ openid, generation: _.exists(false) }).remove()
-  await db.collection('intel_digests').where({ openid }).remove()
+  await db.collection('intel_digests').where({ openid, generation: _.lt(deletion.generation) }).remove()
+  await db.collection('intel_digests').where({ openid, generation: _.exists(false) }).remove()
   const apps = await db.collection('apps').where({ openid }).remove()
   const rem = await db.collection('reminders').where({ openid }).remove()
   await db.collection('preps').where({ openid }).remove()
@@ -862,7 +863,8 @@ handlers.deleteAllMine = async (ev, openid) => {
   if (p._id) await db.collection('profiles').doc(openid).set({ data: keep })
   await db.collection('intel_feedback').where({ openid, generation: _.lt(deletion.generation) }).remove()
   await db.collection('intel_feedback').where({ openid, generation: _.exists(false) }).remove()
-  await db.collection('intel_digests').where({ openid }).remove()
+  await db.collection('intel_digests').where({ openid, generation: _.lt(deletion.generation) }).remove()
+  await db.collection('intel_digests').where({ openid, generation: _.exists(false) }).remove()
   return { apps: apps.stats.removed, reminders: rem.stats.removed, companies: own.stats.removed }
 }
 

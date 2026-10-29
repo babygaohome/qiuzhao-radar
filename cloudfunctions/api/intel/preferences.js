@@ -29,7 +29,8 @@ async function markIntelDeleted (db, openid, command, now) {
     const old = await readOptionalDocument(db, 'intel_preferences', openid)
     const revision = old && Number.isSafeInteger(old.revision) ? old.revision : 0
     const generation = old && Number.isSafeInteger(old.generation) ? old.generation : 0
-    const next = { deleted: true, generation: generation + 1, revision: revision + 1, deletedAt: now() }
+    const digestGeneration = old && Number.isSafeInteger(old.digestGeneration) ? old.digestGeneration : 0
+    const next = { deleted: true, generation: generation + 1, digestGeneration: digestGeneration + 1, revision: revision + 1, deletedAt: now() }
     if (!old) {
       try { await col.add({ data: Object.assign({ _id: openid }, next) }); return { previousGeneration: generation, generation: generation + 1 } } catch (error) {
         if (/duplicate|already exists|_id.*exist/i.test(String(error && (error.message || error.errMsg || error)))) continue
@@ -110,8 +111,12 @@ function createPreferenceHandlers (options) {
     const oldResult = await readOptionalDocument(db, 'intel_preferences', openid)
     await takeLimit(openid, 'intelPreferences', 30)
     const old = Object.assign(defaultPreferences(), oldResult || {})
-    if (old.revision !== event.revision) return fail('conflict', '偏好已在其他设备更新，请刷新后重试', { revision: old.revision, preferences: old })
-    const next = Object.assign({}, patch, { revision: old.revision + 1, updatedAt: now() })
+    if (old.revision !== event.revision) return fail('conflict', '偏好已在其他设备更新，请刷新后重试', { revision: old.revision, preferences: preferenceView(oldResult) })
+    const oldDigestGeneration = oldResult && Number.isSafeInteger(oldResult.digestGeneration) ? oldResult.digestGeneration : 0
+    const wasDigestEnabled = !!(oldResult && oldResult.deleted !== true && oldResult.dailyDigestEnabled === true)
+    const changesDigestEnabled = patch.dailyDigestEnabled !== undefined && patch.dailyDigestEnabled !== wasDigestEnabled
+    const digestGeneration = oldDigestGeneration + (changesDigestEnabled ? 1 : 0)
+    const next = Object.assign({}, patch, { digestGeneration, revision: old.revision + 1, updatedAt: now() })
     if (oldResult) {
       const updateData = Object.assign({}, next, { deleted: false, generation: oldResult.generation || 0 })
       const updated = await col.where({ _id: openid, revision: old.revision }).update({ data: updateData })
