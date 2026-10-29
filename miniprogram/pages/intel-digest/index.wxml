@@ -1,0 +1,104 @@
+<view class="digest-page">
+  <view class="digest-hero">
+    <view class="digest-eyebrow">DAILY BRIEFING</view>
+    <view class="digest-title">每日简报</view>
+    <view class="digest-subtitle">按你选择的频道汇总近期公开信息</view>
+    <view class="digest-pending">{{contractNotice}}</view>
+  </view>
+
+  <view class="digest-tabs">
+    <view class="digest-tab {{tab === 'today' ? 'digest-tab-on' : ''}}" data-tab="today" bindtap="onSelectTab">今日</view>
+    <view class="digest-tab {{tab === 'history' ? 'digest-tab-on' : ''}}" data-tab="history" bindtap="onSelectTab">历史</view>
+  </view>
+
+  <view wx:if="{{tab === 'today'}}">
+    <view wx:if="{{loading}}" class="digest-state"><view class="digest-state-title">正在整理今日简报</view></view>
+    <view wx:elif="{{error}}" class="digest-state"><view class="digest-state-title">暂时无法加载</view><view class="digest-state-copy">{{error}}</view><button class="digest-action" bindtap="onRetry">重试</button></view>
+    <view wx:elif="{{empty}}" class="digest-state"><view class="digest-state-title">暂无简报内容</view><view class="digest-state-copy">没有足够符合条件的资讯时会保持空白，不会补入未核实内容。</view></view>
+    <view wx:else>
+      <view class="digest-date">{{digest.localDate}}</view>
+      <view wx:if="{{digest.readAt}}" class="digest-read-state">已读</view>
+      <view wx:elif="{{readBusyDate === digest.localDateRaw}}" class="digest-read-state">正在记录已读状态</view>
+      <view wx:if="{{readErrorDate === digest.localDateRaw}}" class="digest-read-error">
+        <text>暂时没有记下已读状态</text><button class="digest-inline-action" bindtap="onRetryMarkRead">重试</button>
+      </view>
+      <view class="digest-list">
+        <view wx:for="{{items}}" wx:key="itemId" class="digest-card" data-id="{{item.itemId}}" bindtap="onOpenItem">
+          <view class="digest-source">{{item.sourceName}}</view>
+          <view class="digest-card-title">{{item.title}}</view>
+          <view wx:if="{{item.reason}}" class="digest-reason">{{item.reason}}</view>
+          <view wx:if="{{item.publishedDate}}" class="digest-time">{{item.publishedDate}}</view>
+          <button class="digest-bookmark {{item.feedback.bookmarked ? 'digest-bookmark-on' : ''}}" disabled="{{feedbackBusyId === item.itemId}}" data-id="{{item.itemId}}" data-context="today" catchtap="onToggleBookmark">
+            {{feedbackBusyId === item.itemId ? '处理中' : (item.feedback.bookmarked ? '取消收藏' : '收藏')}}
+          </button>
+          <view wx:if="{{item.feedbackError}}" class="digest-feedback-error">{{item.feedbackError}}</view>
+          <view class="digest-open">查看资讯详情 ›</view>
+        </view>
+      </view>
+      <view wx:if="{{jobItems.length}}" class="digest-jobs">
+        <view class="digest-section-title">你已关注的已核实岗位</view>
+        <view wx:for="{{jobItems}}" wx:key="companyId" class="digest-card digest-job-card" data-id="{{item.companyId}}" bindtap="onOpenJob">
+          <view class="digest-source">{{item.company}}</view>
+          <view class="digest-card-title">{{item.title}}</view>
+          <view class="digest-reason">{{item.reason}}</view>
+          <view class="digest-time">截止 {{item.deadline}}</view>
+          <view class="digest-open">查看岗位详情 ›</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <view wx:else>
+    <view wx:if="{{historyLocalDate}}">
+      <view class="digest-history-heading" bindtap="onBackToHistory">‹　返回历史列表</view>
+      <view wx:if="{{historyDetailLoading}}" class="digest-state"><view class="digest-state-title">正在加载这一天的简报</view></view>
+      <view wx:elif="{{historyDetailError}}" class="digest-state"><view class="digest-state-title">简报暂不可用</view><view class="digest-state-copy">{{historyDetailError}}</view><button class="digest-action" bindtap="onRetryHistoryDate">重试</button></view>
+      <view wx:elif="{{historyDetailEmpty}}" class="digest-state"><view class="digest-state-title">这一天没有简报内容</view></view>
+      <view wx:else>
+        <view class="digest-date">{{historyDigest.localDate}}</view>
+        <view wx:if="{{historyDigest.readAt}}" class="digest-read-state">已读</view>
+        <view wx:elif="{{readBusyDate === historyDigest.localDateRaw}}" class="digest-read-state">正在记录已读状态</view>
+        <view wx:if="{{readErrorDate === historyDigest.localDateRaw}}" class="digest-read-error">
+          <text>暂时没有记下已读状态</text><button class="digest-inline-action" bindtap="onRetryMarkRead">重试</button>
+        </view>
+        <view class="digest-list">
+          <view wx:for="{{historyItems}}" wx:key="itemId" class="digest-card" data-id="{{item.itemId}}" bindtap="onOpenItem">
+            <view class="digest-source">{{item.sourceName}}</view>
+            <view class="digest-card-title">{{item.title}}</view>
+            <view wx:if="{{item.reason}}" class="digest-reason">{{item.reason}}</view>
+            <view wx:if="{{item.publishedDate}}" class="digest-time">{{item.publishedDate}}</view>
+            <button class="digest-bookmark {{item.feedback.bookmarked ? 'digest-bookmark-on' : ''}}" disabled="{{feedbackBusyId === item.itemId}}" data-id="{{item.itemId}}" data-context="history" catchtap="onToggleBookmark">
+              {{feedbackBusyId === item.itemId ? '处理中' : (item.feedback.bookmarked ? '取消收藏' : '收藏')}}
+            </button>
+            <view wx:if="{{item.feedbackError}}" class="digest-feedback-error">{{item.feedbackError}}</view>
+            <view class="digest-open">查看资讯详情 ›</view>
+          </view>
+        </view>
+        <view wx:if="{{historyJobItems.length}}" class="digest-jobs">
+          <view class="digest-section-title">你已关注的已核实岗位</view>
+          <view wx:for="{{historyJobItems}}" wx:key="companyId" class="digest-card digest-job-card" data-id="{{item.companyId}}" bindtap="onOpenJob">
+            <view class="digest-source">{{item.company}}</view>
+            <view class="digest-card-title">{{item.title}}</view>
+            <view class="digest-reason">{{item.reason}}</view>
+            <view class="digest-time">截止 {{item.deadline}}</view>
+            <view class="digest-open">查看岗位详情 ›</view>
+          </view>
+        </view>
+      </view>
+    </view>
+    <view wx:elif="{{historyLoading}}" class="digest-state"><view class="digest-state-title">正在加载历史简报</view></view>
+    <view wx:elif="{{historyError}}" class="digest-state"><view class="digest-state-title">历史记录暂不可用</view><view class="digest-state-copy">{{historyError}}</view><button class="digest-action" bindtap="onRetry">重试</button></view>
+    <view wx:elif="{{!histories.length}}" class="digest-state"><view class="digest-state-title">还没有历史简报</view></view>
+    <view wx:else class="digest-history-list">
+      <view wx:for="{{histories}}" wx:key="localDate" class="digest-history-card" data-date="{{item.localDate}}" bindtap="onOpenHistoryDate">
+        <view class="digest-history-date">{{item.dateLabel}} <text class="digest-arrow">›</text></view>
+        <view class="digest-history-count">{{item.itemCount}} 条内容</view>
+        <view wx:if="{{item.readAt}}" class="digest-read-state">已读</view>
+      </view>
+      <view wx:if="{{historyMoreError}}" class="digest-more-error">{{historyMoreError}}</view>
+      <button wx:if="{{historyHasMore}}" class="digest-more-button" loading="{{historyMoreLoading}}" disabled="{{historyMoreLoading}}" bindtap="onLoadMoreHistory">
+        {{historyMoreError ? '重试' : (historyMoreLoading ? '正在加载' : '加载更多')}}
+      </button>
+    </view>
+  </view>
+</view>

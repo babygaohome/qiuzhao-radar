@@ -26,6 +26,8 @@ const auditCoverage = require('./audit-coverage')
 const catalogQuality = require('./catalog-quality')
 const intel = require('./intel/handlers')
 const intelPreferences = require('./intel/preferences')
+const { createDigestFeatureHandlers } = require('./intel/digest-handlers')
+const { createDigestJobsReader } = require('./intel/digest-jobs')
 const { readOptionalDocument, markIntelDeleted } = intelPreferences
 // User paused the full-catalog review on 2026-10-22. Keep existing results.
 const CATALOG_AUDIT_PAUSED = true
@@ -212,6 +214,28 @@ Object.assign(handlers, intel.createIntelHandlers({
 Object.assign(handlers, intelPreferences.createPreferenceHandlers({
   db,
   takeLimit: (openid, kind, limit) => takeQuota(openid, kind, limit, kind === 'intelFeedback' ? '情报反馈' : '情报设置')
+}))
+Object.assign(handlers, createDigestFeatureHandlers({
+  db,
+  enabled: process.env.INTEL_DIGEST_ENABLED === 'true',
+  loadJobItems: async (openid, companyIds) => {
+    if (!Array.isArray(companyIds) || companyIds.length === 0) return []
+    // Read only the hidden-company IDs needed by the existing visibility predicate.
+    const hiddenResult = await db.collection('profiles').where({ _id: openid }).field({ hidden: true }).limit(1).get()
+    if (!hiddenResult || !Array.isArray(hiddenResult.data)) throw new AppError('server_error', '无法核验岗位可见性')
+    const hidden = hiddenResult.data[0] && hiddenResult.data[0].hidden
+    if (hidden !== undefined && (!Array.isArray(hidden) || hidden.some(id => typeof id !== 'string'))) throw new AppError('server_error', '岗位可见性数据无效')
+    const reader = createDigestJobsReader({
+      db,
+      command: _,
+      buildWhere,
+      readHidden: async () => hidden || []
+    })
+    const candidates = await reader.read(openid)
+    const wanted = new Set(companyIds)
+    const byCompany = new Map(candidates.filter(item => wanted.has(item.companyId)).map(item => [item.companyId, item]))
+    return companyIds.map(id => byCompany.get(id)).filter(Boolean)
+  }
 }))
 handlers.publicJobsStatus = async () => {
   const record=await readDoc('meta','publicJobsLast')
@@ -850,7 +874,8 @@ handlers.deleteAllMine = async (ev, openid) => {
   const deletion = await markIntelDeleted(db, openid, _, () => new Date().toISOString())
   await db.collection('intel_feedback').where({ openid, generation: _.lt(deletion.generation) }).remove()
   await db.collection('intel_feedback').where({ openid, generation: _.exists(false) }).remove()
-  await db.collection('intel_digests').where({ openid }).remove()
+  await db.collection('intel_digests').where({ openid, generation: _.lt(deletion.generation) }).remove()
+  await db.collection('intel_digests').where({ openid, generation: _.exists(false) }).remove()
   const apps = await db.collection('apps').where({ openid }).remove()
   const rem = await db.collection('reminders').where({ openid }).remove()
   await db.collection('preps').where({ openid }).remove()
@@ -862,7 +887,8 @@ handlers.deleteAllMine = async (ev, openid) => {
   if (p._id) await db.collection('profiles').doc(openid).set({ data: keep })
   await db.collection('intel_feedback').where({ openid, generation: _.lt(deletion.generation) }).remove()
   await db.collection('intel_feedback').where({ openid, generation: _.exists(false) }).remove()
-  await db.collection('intel_digests').where({ openid }).remove()
+  await db.collection('intel_digests').where({ openid, generation: _.lt(deletion.generation) }).remove()
+  await db.collection('intel_digests').where({ openid, generation: _.exists(false) }).remove()
   return { apps: apps.stats.removed, reminders: rem.stats.removed, companies: own.stats.removed }
 }
 
@@ -883,7 +909,7 @@ handlers.exportMine = async (ev, openid) => {
     .filter(x => (x.generation || 0) === activeGeneration)
     .map(x => ({ itemId: x.itemId, state: x.state || {}, reason: x.reason || '', updatedAt: x.updatedAt || '' }))
   const intelDigestResult = await db.collection('intel_digests').where({ openid }).limit(1000).get()
-  const intelDigests = (intelDigestResult.data || []).map(x => Object.fromEntries(['localDate', 'timezone', 'algorithmVersion', 'itemIds', 'jobCompanyIds', 'generatedAt', 'status'].filter(k => x[k] !== undefined).map(k => [k, x[k]])))
+  const intelDigests = (intelDigestResult.data || []).map(x => Object.fromEntries(['localDate', 'timezone', 'algorithmVersion', 'itemIds', 'jobCompanyIds', 'generatedAt', 'status', 'readAt'].filter(k => x[k] !== undefined).map(k => [k, x[k]])))
   const companies = (await db.collection('companies').where({ source: 'manual', owner: openid }).limit(1000).get()).data
     .map(c => ({ id: c._id, company: c.company, industry: c.industry, ctype: c.ctype, batch: c.batch, openDate: c.openDate,
       deadline: c.deadline, rolling: !c.deadline && c.deadlineText === '招满即止', url: c.url, note: c.note, cities: c.cities, exam: c.exam }))

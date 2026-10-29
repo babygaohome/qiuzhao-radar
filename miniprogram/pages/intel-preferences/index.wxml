@@ -28,7 +28,7 @@
 
     <view class="preferences-section">
       <view class="preferences-section-title">每日简报偏好</view>
-      <view class="preferences-row"><view><view class="preferences-label">启用每日简报偏好</view><view class="preferences-hint">当前版本尚未生成站内简报；此处只保存设置，不会触发微信通知。</view></view><switch checked="{{dailyDigestEnabled}}" color="#3156D3" bindchange="onDigestChange" /></view>
+      <view class="preferences-row"><view><view class="preferences-label">启用每日简报</view><view wx:if="{{digestReady}}" class="preferences-hint">每小时检查一次；到达你设置的时间后生成站内简报，不会自动发送微信通知。</view><view wx:else class="preferences-hint">当前版本尚未开放每日简报，此处仅保存偏好。</view></view><switch checked="{{dailyDigestEnabled}}" color="#3156D3" bindchange="onDigestChange" /></view>
       <view class="preferences-field"><text>偏好时间</text><picker mode="time" value="{{digestLocalTime}}" bindchange="onTimeChange"><view class="preferences-picker">{{digestLocalTime}}　›</view></picker></view>
       <view class="preferences-field"><text>时区</text><input class="preferences-input" value="{{timezone}}" placeholder="例如 Asia/Shanghai" bindinput="onTimezoneChange" /></view>
       <view class="preferences-section-title preferences-language-title">资讯语言</view>

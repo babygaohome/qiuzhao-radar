@@ -7,11 +7,11 @@ const root = path.resolve(__dirname, '..')
 const tick = () => Promise.resolve().then(() => Promise.resolve())
 const plain = value => JSON.parse(JSON.stringify(value))
 function deferred () { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
-function makePage (relative, api, wx = {}) {
+function makePage (relative, api, wx = {}, featureConfig = {}) {
   let definition
   const modules = {
     '../../utils/util.js': { api, copyLink () {} },
-    '../../config.js': { intelEnabled: true, intelDemoMode: false },
+    '../../config.js': Object.assign({ intelEnabled: true, intelDemoMode: false, intelDigestEnabled: false }, featureConfig),
     './demo-fixtures.js': [],
     '../intel/demo-fixtures.js': []
   }
@@ -62,6 +62,11 @@ async function preferencesPage () {
   failed.onLoad(); await tick()
   assert.equal(failed.data.error, 'offline')
   assert.equal(failed.data.loaded, false)
+
+  const digestOff = makePage('miniprogram/pages/intel-preferences/index.js', () => Promise.resolve({}), {}, { intelDigestEnabled: false })
+  const digestOn = makePage('miniprogram/pages/intel-preferences/index.js', () => Promise.resolve({}), {}, { intelDigestEnabled: true })
+  assert.equal(digestOff.data.digestReady, false)
+  assert.equal(digestOn.data.digestReady, true)
 }
 
 async function feedbackPages () {
@@ -101,10 +106,13 @@ function copyClaims () {
   const feedCopy = fs.readFileSync(path.join(root, 'miniprogram/pages/intel/index.wxml'), 'utf8')
   assert.match(preferenceCopy, /已选频道的内容会优先排在列表前面/)
   assert.match(preferenceCopy, /细分兴趣、资讯语言和显式反馈目前只保存，不参与筛选或排序/)
-  assert.match(preferenceCopy, /当前版本尚未生成站内简报/)
+  assert.match(preferenceCopy, /当前版本尚未开放每日简报/)
   assert.match(preferenceCopy, /当前版本尚未用这些反馈调整推荐顺序/)
   assert.match(preferenceCopy, /当前版本不会收集阅读行为/)
+  assert.match(preferenceCopy, /wx:if="\{\{digestReady\}\}"[^>]*>每小时检查一次；到达你设置的时间后生成站内简报/)
+  assert.match(preferenceCopy, /wx:else class="preferences-hint">当前版本尚未开放每日简报/)
   assert.match(feedCopy, /行业情报/)
+  assert.match(feedCopy, /class="intel-settings-link intel-digest-link"/)
   assert.doesNotMatch(feedCopy, /今日情报|DAILY BRIEFING/i)
 }
 

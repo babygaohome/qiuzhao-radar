@@ -48,6 +48,44 @@ async function test () {
   assert.equal((await h.call('A', 'intelGetPreferences')).preferences.topics.ai, 0.7)
   assert.equal(createdCollections.some(name => /^intel_/.test(name)), false, 'API must not auto-create InfoFlow collections')
 
+  // Digest scheduling generation changes only on real enablement transitions and deletion.
+  const digestPrefs = await h.call('G', 'intelSavePreferences', { revision: 0, preferences: { topics: { ai: 1 } } })
+  assert.equal(digestPrefs.ok, true)
+  assert.equal(Object.hasOwn(digestPrefs.preferences, 'digestGeneration'), false, 'internal digest generation must not be returned')
+  assert.equal(h.table('intel_preferences').get('G').digestGeneration, 0, 'new preference starts digest generation at zero')
+  assert.equal((await h.call('G', 'intelFeedback', { itemId: 'digest-feedback', feedbackAction: 'like' })).ok, true)
+  const feedbackBeforeToggle = [...h.table('intel_feedback').values()].find(row => row.openid === 'G')
+  assert.equal(feedbackBeforeToggle.generation, 0)
+
+  const digestEnabled = await h.call('G', 'intelSavePreferences', { revision: 1, preferences: { dailyDigestEnabled: true } })
+  assert.equal(digestEnabled.ok, true)
+  assert.equal(h.table('intel_preferences').get('G').digestGeneration, 1)
+  assert.equal(h.table('intel_preferences').get('G').generation, 0, 'digest enablement must not change feedback generation')
+  const unchangedDigestFlag = await h.call('G', 'intelSavePreferences', { revision: 2, preferences: { timezone: 'Australia/Brisbane' } })
+  assert.equal(unchangedDigestFlag.ok, true)
+  assert.equal(h.table('intel_preferences').get('G').digestGeneration, 1, 'ordinary preference updates do not change digest generation')
+  assert.equal((await h.call('G', 'intelSavePreferences', { revision: 3, preferences: { dailyDigestEnabled: false } })).ok, true)
+  assert.equal(h.table('intel_preferences').get('G').digestGeneration, 2, 'disabling advances digest generation')
+  assert.equal((await h.call('G', 'intelSavePreferences', { revision: 4, preferences: { dailyDigestEnabled: true } })).ok, true)
+  assert.equal(h.table('intel_preferences').get('G').digestGeneration, 3, 're-enabling after disable advances digest generation')
+  assert.equal(h.table('intel_preferences').get('G').generation, 0, 'digest toggles leave feedback generation unchanged')
+  assert.equal((await h.call('G', 'intelFeedback', { itemId: 'digest-feedback', feedbackAction: 'bookmark' })).state.liked, true, 'feedback remains available across digest toggles')
+  assert.equal(h.table('intel_feedback').get(feedbackBeforeToggle._id).generation, 0)
+  const digestExport = await h.call('G', 'exportMine')
+  assert.equal(Object.hasOwn(digestExport.intel.preferences, 'digestGeneration'), false, 'internal digest generation must not be exported')
+  const deletedDigestPrefs = await h.call('G', 'deleteAllMine', { confirm: '确认删除' })
+  assert.equal(deletedDigestPrefs.error, undefined)
+  assert.equal(h.table('intel_preferences').get('G').digestGeneration, 4, 'deletion advances digest generation')
+  const digestRestartState = await h.call('G', 'intelGetPreferences')
+  assert.equal(Object.hasOwn(digestRestartState.preferences, 'digestGeneration'), false, 'tombstone generation is private')
+  assert.equal((await h.call('G', 'intelSavePreferences', { revision: digestRestartState.preferences.revision, preferences: { dailyDigestEnabled: true } })).ok, true)
+  assert.equal(h.table('intel_preferences').get('G').digestGeneration, 5, 'restart after deletion must continue rather than reset digest generation')
+  assert.equal(h.table('intel_preferences').get('G').generation, 1, 'restart preserves established feedback generation semantics')
+  const digestRestartFeedback = await h.call('G', 'intelFeedback', { itemId: 'digest-feedback', feedbackAction: 'like' })
+  assert.equal(digestRestartFeedback.ok, true, 'feedback remains available after explicitly re-enabling preferences')
+  assert.equal(digestRestartFeedback.state.liked, true)
+  assert.equal([...h.table('intel_feedback').values()].find(row => row.openid === 'G').generation, 1)
+
   const feedRows = [
     { id: 'semi-new', category: 'semiconductor', status: 'published', publishedAt: '2026-10-29T00:00:00Z', title: 'New semiconductor' },
     { id: 'ai-old', category: 'ai', status: 'published', publishedAt: '2026-10-20T00:00:00Z', title: 'Older AI' },
@@ -104,9 +142,17 @@ async function test () {
   assert.equal(last.ok, true)
   assert.equal((await h.call('A', 'intelFeedback', { itemId: 'article-rate', feedbackAction: 'like' })).error, 'intelFeedback_limit')
 
+  h.table('intel_digests').set('digest-a', {
+    _id: 'digest-a', openid: 'A', localDate: '2026-10-29', timezone: 'Asia/Shanghai',
+    algorithmVersion: 'm4-test', itemIds: ['item-a'], jobCompanyIds: ['company-a'],
+    generatedAt: '2026-10-29T01:00:00.000Z', status: 'ready', readAt: '2026-10-29T02:00:00.000Z',
+    generation: 0, digestGeneration: 2
+  })
   const exported = await h.call('A', 'exportMine')
   assert.equal(exported.intel.preferences.topics.ai, 0.7)
   assert.equal(exported.intel.feedback.length, 2)
+  assert.equal(exported.intel.digests[0].readAt, '2026-10-29T02:00:00.000Z', 'digest read state is included in personal export')
+  assert.equal(Object.hasOwn(exported.intel.digests[0], 'digestGeneration'), false, 'internal digest generation is not exported')
   assert.equal(JSON.stringify(exported.intel).includes('B'), false)
 
   // Competing preference writes with the same revision: exactly one can commit.
@@ -232,6 +278,53 @@ async function test () {
   assert.equal(cRecords.length, 1)
   assert.equal(cRecords[0].generation, 1)
   assert.equal(cRecords[0].state.bookmarked, true, 'old-generation cleanup must never delete the new record')
+
+  // An in-flight deletion must preserve a digest created after re-enabling the account.
+  await h.call('Z', 'intelSavePreferences', { revision: 0, preferences: { dailyDigestEnabled: true } })
+  h.table('intel_digests').set('z-legacy', { _id: 'z-legacy', openid: 'Z', localDate: '2026-10-28', itemIds: ['legacy'] })
+  h.table('intel_digests').set('z-old', { _id: 'z-old', openid: 'Z', generation: 0, localDate: '2026-10-29', itemIds: ['old'] })
+  h.table('intel_digests').set('b-new', { _id: 'b-new', openid: 'B', generation: 1, localDate: '2026-10-29', itemIds: ['b'] })
+  let reachedDigestSweepResolve, resumeDigestSweepResolve
+  const reachedDigestSweep = new Promise(resolve => { reachedDigestSweepResolve = resolve })
+  const resumeDigestSweep = new Promise(resolve => { resumeDigestSweepResolve = resolve })
+  const beforeDigestRace = h.db.collection.bind(h.db)
+  let heldFirstDigestRemove = false
+  h.db.collection = name => {
+    const collection = beforeDigestRace(name)
+    if (name !== 'intel_digests') return collection
+    return new Proxy(collection, { get (target, key) {
+      if (key === 'where') return condition => {
+        const query = target.where(condition)
+        return new Proxy(query, { get (queryTarget, queryKey) {
+          if (queryKey === 'remove') return async () => {
+            if (!heldFirstDigestRemove) {
+              heldFirstDigestRemove = true
+              reachedDigestSweepResolve()
+              await resumeDigestSweep
+            }
+            return queryTarget.remove()
+          }
+          const value = Reflect.get(queryTarget, queryKey)
+          return typeof value === 'function' ? value.bind(queryTarget) : value
+        } })
+      }
+      const value = Reflect.get(target, key)
+      return typeof value === 'function' ? value.bind(target) : value
+    } })
+  }
+  const deletingZ = h.call('Z', 'deleteAllMine', { confirm: '确认删除' })
+  await reachedDigestSweep
+  const zTombstone = await h.call('Z', 'intelGetPreferences')
+  assert.equal((await h.call('Z', 'intelSavePreferences', { revision: zTombstone.preferences.revision, preferences: { dailyDigestEnabled: true } })).ok, true)
+  h.table('intel_digests').set('z-fresh', { _id: 'z-fresh', openid: 'Z', generation: 1, localDate: '2026-10-29', itemIds: ['fresh'] })
+  resumeDigestSweepResolve()
+  assert.equal((await deletingZ).error, undefined)
+  h.db.collection = beforeDigestRace
+  const remainingDigests = [...h.table('intel_digests').values()]
+  assert.equal(remainingDigests.some(row => row._id === 'z-legacy'), false, 'delete removes legacy digests without a generation')
+  assert.equal(remainingDigests.some(row => row._id === 'z-old'), false, 'delete removes digests from the tombstoned generation')
+  assert.equal(remainingDigests.some(row => row._id === 'z-fresh'), true, 'delete must preserve a digest from the re-enabled generation')
+  assert.equal(remainingDigests.some(row => row._id === 'b-new'), true, 'delete must preserve another account digest')
 }
 
 test().then(() => process.stdout.write('intel-user-data: all assertions passed\n')).catch(error => { console.error(error); process.exitCode = 1 })
