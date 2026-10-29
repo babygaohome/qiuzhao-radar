@@ -1,9 +1,26 @@
-.wrap { padding: 28rpx; }
-.notice { margin-bottom: 18rpx; padding: 14rpx 18rpx; border-radius: 14rpx; background: var(--accent-soft); color: var(--accent); font-size: 23rpx; font-weight: 650; }
-.card { padding: 26rpx; border-radius: 20rpx; background: var(--surface); border: 1rpx solid var(--line); box-shadow: var(--shadow); }
-.meta { display: flex; flex-wrap: wrap; gap: 14rpx; color: var(--muted); font-size: 22rpx; }
-.title { margin-top: 20rpx; font-size: 35rpx; font-weight: 750; line-height: 1.45; }
-.summary { margin-top: 20rpx; font-size: 27rpx; line-height: 1.7; color: var(--ink); }
-.link { display: inline-block; margin-top: 28rpx; padding: 12rpx 22rpx; background: var(--accent-soft); color: var(--accent); border-radius: 999rpx; font-size: 24rpx; }
-.unknown { margin-top: 24rpx; color: var(--muted); font-size: 23rpx; }
-.state { padding: 28rpx; border-radius: 18rpx; background: var(--surface); color: var(--muted); text-align: center; }
+.intel-detail-page { min-height: 100vh; padding: 24rpx 28rpx 100rpx; color: var(--ink); }
+.intel-detail-notice { margin-bottom: 18rpx; padding: 15rpx 18rpx; border-radius: 14rpx; background: var(--accent-soft); color: var(--accent); font-size: 22rpx; font-weight: 650; }
+.intel-detail-card, .intel-detail-state { padding: 28rpx; border: 1rpx solid var(--line); border-radius: 22rpx; background: var(--surface); box-shadow: var(--shadow); }
+.intel-detail-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 12rpx; color: var(--muted); font-size: 21rpx; }
+.intel-detail-category { padding: 4rpx 11rpx; border-radius: 7rpx; background: var(--accent-soft); color: var(--accent); font-weight: 650; }
+.intel-detail-source { overflow-wrap: anywhere; }
+.intel-detail-title { margin-top: 18rpx; color: var(--ink); font-size: 36rpx; line-height: 1.48; font-weight: 750; overflow-wrap: anywhere; }
+.intel-detail-date { margin-top: 10rpx; color: var(--muted); font-size: 21rpx; }
+.intel-detail-rule { height: 1rpx; margin: 24rpx 0; background: var(--line); }
+.intel-detail-section-title { color: var(--ink); font-size: 24rpx; font-weight: 700; }
+.intel-detail-summary { margin-top: 10rpx; color: var(--ink); font-size: 26rpx; line-height: 1.75; overflow-wrap: anywhere; white-space: pre-wrap; }
+.intel-detail-status { margin-top: 15rpx; color: var(--muted); font-size: 21rpx; line-height: 1.55; }
+.intel-detail-source-box, .intel-detail-evidence { margin-top: 26rpx; padding-top: 22rpx; border-top: 1rpx solid var(--line); }
+.intel-detail-source-name { margin-top: 10rpx; color: var(--muted); font-size: 23rpx; overflow-wrap: anywhere; }
+.intel-detail-link, .intel-detail-action { min-height: 76rpx; margin: 18rpx 0 0; padding: 0 24rpx; border: 1rpx solid var(--line); border-radius: 14rpx; background: var(--accent-soft); color: var(--accent); font-size: 23rpx; line-height: 76rpx; }
+.intel-detail-link::after, .intel-detail-action::after { border: 0; }
+.intel-detail-unknown { margin-top: 12rpx; color: var(--muted); font-size: 22rpx; }
+.intel-detail-evidence-row { margin-top: 12rpx; color: var(--accent); font-size: 22rpx; line-height: 1.6; overflow-wrap: anywhere; word-break: break-all; }
+.intel-detail-state { margin-top: 24rpx; text-align: center; }
+.intel-detail-state-title { color: var(--ink); font-size: 26rpx; font-weight: 680; }
+.intel-detail-state-copy { margin-top: 10rpx; color: var(--muted); font-size: 22rpx; line-height: 1.6; overflow-wrap: anywhere; }
+.intel-detail-action { display: inline-flex; align-items: center; justify-content: center; min-height: 76rpx; margin-top: 22rpx; border-color: transparent; background: var(--accent); color: #fff; }
+
+@media (prefers-color-scheme: dark) {
+  .intel-detail-action { color: #101722; }
+}

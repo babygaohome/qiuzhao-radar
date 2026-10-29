@@ -13,6 +13,7 @@ function matchValue (v, q) {
   if (!q || !q.__op) return v === q
   const x = q.value
   switch (q.__op) {
+    case 'eq': return v === x
     case 'neq': return v !== x
     case 'exists': return (v !== undefined) === x
     case 'in': return x.includes(v)
@@ -173,7 +174,9 @@ async function run () {
     check(!JSON.stringify(await h.call('B', action, { id: 'public', ids: ['public'], tab: 'verified' })).includes('PRIVATE_REPORT_NOTE'), 'report note exposed in ' + action)
   }
   {
-    put('companies', 'disp', { company: '反馈测试企业', source: 'auto', v: 'official', hasOrig: true, dl: '9999-12-31', deadline: '2099-12-31', search: '反馈测试企业' })
+    const coverage = require(path.join(root, 'cloudfunctions/api/audit-coverage.js'))
+    const dispAudit = { company: '反馈测试企业', positions: ['反馈测试岗位'] }
+    put('companies', 'disp', { ...dispAudit, source: 'auto', v: 'official', hasOrig: true, dl: '9999-12-31', deadline: '2099-12-31', search: '反馈测试企业', catalogAudit: { state: 'verified', coverageComplete: true, coverageFingerprint: coverage.coverageFingerprint(dispAudit), proofMethod: 'browser_official', checkedAt: '2026-10-22T10:00:00.000Z', jobs: { '反馈测试岗位': { exists: true, cohort: 'matched', open: true, officialSource: 'confirmed' } } } })
     const inVerified = async () => (await h.call('A', 'list', { tab: 'verified', q: '' })).items.some(x => x._id === 'disp')
     check(await inVerified(), 'dispute fixture not verified at start')
     await h.call('A', 'reportIssue', { id: 'disp', type: '岗位已下架' })
@@ -203,20 +206,25 @@ async function run () {
   check(!(await h.call('B', 'todo', {})).items.some(x => x.id === 'soon'), 'B sees A todo')
   h.table('apps').delete('A_soon'); h.table('apps').delete('A_old')
   const common = { company: 'recent fixture', source: 'auto', dl: '9999-12-31', deadline: '', seen: today }
-  put('companies', 'newVerified', { ...common, v: 'official', addedAt: today, updated: today })
+  const verifiedCatalog = row => {
+    const record = { ...row, positions: ['软件工程师'] }
+    const coverage = require(path.join(root, 'cloudfunctions/api/audit-coverage.js'))
+    return { ...record, catalogAudit: { state: 'verified', coverageComplete: true, coverageFingerprint: coverage.coverageFingerprint(record), proofMethod: 'browser_official', jobs: { 软件工程师: { exists: true, cohort: 'matched', open: true, officialSource: 'confirmed' } } } }
+  }
+  put('companies', 'newVerified', verifiedCatalog({ ...common, v: 'official', addedAt: today, updated: today }))
   put('companies', 'newLead', { ...common, v: 'single', addedAt: today, updated: today })
-  put('companies', 'updateVerified', { ...common, v: 'official', addedAt: oldDate, updated: today })
+  put('companies', 'updateVerified', verifiedCatalog({ ...common, v: 'official', addedAt: oldDate, updated: today }))
   put('companies', 'updateLead', { ...common, v: 'single', addedAt: oldDate, updated: today })
   put('companies', 'legacyUpdate', { ...common, v: 'single', updated: today })
-  put('companies', 'observedUpdate', { ...common, v: 'official', addedAt: oldDate, updated: oldDate, catalogChangedAt: today })
+  put('companies', 'observedUpdate', verifiedCatalog({ ...common, v: 'official', addedAt: oldDate, updated: oldDate, catalogChangedAt: today }))
   put('companies', 'hiddenNew', { ...common, v: 'single', addedAt: today })
   put('companies', 'expiredNew', { ...common, dl: oldDate, addedAt: today })
   h.table('companies').get('privateA').addedAt = today
   h.table('companies').get('privateB').addedAt = today
   h.table('profiles').get('A').hidden = ['hiddenNew']
   const summary = (await h.call('A', 'stats', { withRecent: true })).recent
-  check(summary.new.total === 3 && summary.new.pending === 1, 'new summary ignores tab, excludes expired/hidden/foreign records')
-  check(summary.updated.total === 4 && summary.updated.pending === 2, 'updated summary excludes newly added and includes legacy/observed business changes')
+  check(summary.new.total === 3 && summary.new.pending === 2, 'new summary counts own private and legacy pending rows, excludes expired/hidden/foreign records: ' + JSON.stringify(summary.new))
+  check(summary.updated.total === 4 && summary.updated.pending === 2, 'updated summary excludes newly added and includes legacy/observed business changes: ' + JSON.stringify(summary.updated))
   const newRows = (await h.call('A', 'list', { tab: 'recent', recentKind: 'new' })).items
   const updatedRows = (await h.call('A', 'list', { tab: 'recent', recentKind: 'updated' })).items
   check(newRows.length === summary.new.total && newRows.some(x => x._id === 'newLead'), 'new entry differs from summary or hides pending')
@@ -290,7 +298,7 @@ async function run () {
     ] } }))
     const fs = await audit.ncssFeedStep(Date.now() + 9000, {})
     const merged = h.table('companies').get(audit.feedId(audit.feedKey('同惠电子')))
-    check(merged.instOk === true && merged.positions.includes('研发工程师') && merged.positions.includes('测试工程师'), 'feed did not enrich region-prefixed existing company')
+    check(merged.instOk === true && merged.positions.includes('研发工程师') && merged.positions.includes('测试工程师'), 'feed did not enrich region-prefixed existing company: ' + JSON.stringify({ fs, merged }))
     const added = h.table('companies').get(audit.feedId(audit.feedKey('江苏新星科技有限公司')))
     check(added && added.instOk && added.srcs[0] === '国家大学生就业服务平台' && added.minEdu === '本科', 'feed did not add institution-posted company')
     check(!h.table('companies').get(audit.feedId(audit.feedKey('某某人力资源服务有限公司'))), 'agency company added')

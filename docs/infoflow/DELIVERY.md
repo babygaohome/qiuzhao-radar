@@ -12,9 +12,9 @@ Both actions are dispatched by the existing `api` cloud function after its curre
 
 ### `intelFeed`
 
-Request: `{ action: "intelFeed", category?: "all"|"jobs"|"ai"|"semiconductor"|"electronics", limit?: 1..20, cursor?: null }`.
+Request: `{ action: "intelFeed", category?: "all"|"jobs"|"ai"|"semiconductor"|"electronics", limit?: 1..20, cursor?: string|null }`.
 
-Response: `{ items: [...], nextCursor: null, digestAt: null }`. Only `status: "published"` fixture records are eligible. Public item fields include `summaryStatus`; absent source, publication date, or summary status is rendered explicitly as unknown. This initial fixture delivery rejects non-empty cursors because pagination has not been implemented.
+Response: `{ items: [...], nextCursor: null, digestAt: null }`. Only `status: "published"` fixture records are eligible. Public item fields include `summaryStatus`; absent source, publication date, or summary status is rendered explicitly as unknown. Pagination uses a signed cursor bound to the authenticated user, category, page size, snapshot, and expiry. Configure INFOFLOW_CURSOR_SECRET with at least 32 characters in an isolated environment before testing multiple pages; no secret is committed.
 
 ### `intelItem`
 
@@ -60,6 +60,8 @@ For a deployed follow-up, leave/unset `INTEL_ENABLED` and restore `intelEnabled:
 
 Actual command results, including pre-change failures and post-change regression results, are recorded in `test-log.txt`. This is local fixture/mocked verification only. CloudBase identity integration, deployed environment flags, real WeChat account isolation, Developer Tools rendering, dark-mode device rendering, and any production configuration were not verified.
 
-## Final reviewer verification
+## Final reviewer verification (follow-up)
 
-The primary agent reran all 15 `security/*.test.cjs` scripts after the final filter/test changes: 12 passed, 3 failed (the same baseline isolation/loading-api/manual-review failures). See `final-test-log.txt` for actual exit codes and output. The focused InfoFlow test passes. This supersedes earlier intermediate unverified statements in test-log.txt. No new regression failure was observed. This remains a draft: real Developer Tools screenshots/compilation and cloud checks are outstanding; pagination is intentionally not implemented in this initial empty-fixture contract and must be added before a populated feed is enabled.
+Primary reviewer executed all 16 security scripts: 14 pass, isolation and manual-review fail. See final-test-log.txt. New signed-pagination and page-behavior tests pass. Existing test fixtures were updated to current per-role audit rules, without changing production recruitment logic. A legal-company-name enrichment assertion and stale source-label assertions still fail; these are not claimed resolved. No screenshot, real Developer Tools compilation, or cloud verification has been completed.
+
+Frontend now handles append/deduplication, retry, refresh/category races, unload cancellation, localized metadata, and explicit disabled/empty/error states with namespaced light/dark styling. Feature flags remain disabled. Backend remains fixture-only; no live ingestion or daily digest is delivered.

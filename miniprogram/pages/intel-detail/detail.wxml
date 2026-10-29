@@ -1,13 +1,33 @@
-<view class="wrap">
-  <view wx:if="{{demo}}" class="notice">演示数据 · 非真实资讯</view>
-  <view wx:if="{{loading}}" class="state">正在加载…</view>
-  <view wx:elif="{{error}}" class="state">{{error}}</view>
-  <view wx:elif="{{item}}" class="card">
-    <view class="meta"><text>{{item.categoryLabel || item.category}}</text><text>{{item.sourceName || '来源未知'}}</text><text>{{item.publishedAt || '发布时间未知'}}</text></view>
-    <view class="title">{{item.title}}</view>
-    <view class="summary">{{item.summaryZh || '暂无摘要'}}</view>
-    <view class="unknown">摘要状态：{{item.summaryStatus || '未知'}}</view>
-    <view wx:if="{{item.originalUrl}}" class="link" bindtap="onCopyLink">复制原文链接</view>
-    <view wx:else class="unknown">原文链接未知</view>
+<view class="intel-detail-page">
+  <view wx:if="{{demo}}" class="intel-detail-notice">演示内容 · 非真实资讯</view>
+  <view wx:if="{{loading}}" class="intel-detail-state">
+    <view class="intel-detail-state-title">正在加载详情</view><view class="intel-detail-state-copy">请稍候片刻</view>
+  </view>
+  <view wx:elif="{{error}}" class="intel-detail-state">
+    <view class="intel-detail-state-title">暂时无法显示</view>
+    <view class="intel-detail-state-copy">{{error}}</view>
+    <button wx:if="{{enabled && !demo && itemId}}" class="intel-detail-action" bindtap="onRetry">重试</button>
+  </view>
+  <view wx:elif="{{item}}" class="intel-detail-card">
+    <view class="intel-detail-meta">
+      <text class="intel-detail-category">{{item.categoryLabel}}</text>
+      <text class="intel-detail-source">{{item.displaySource}}</text>
+    </view>
+    <view class="intel-detail-title">{{item.title || '标题未知'}}</view>
+    <view class="intel-detail-date">{{item.displayDate}}</view>
+    <view class="intel-detail-rule"></view>
+    <view class="intel-detail-section-title">内容摘要</view>
+    <view class="intel-detail-summary">{{item.displaySummary}}</view>
+    <view class="intel-detail-status">{{item.displaySummaryStatus}} · 摘要依据状态以来源信息为准</view>
+    <view class="intel-detail-source-box">
+      <view class="intel-detail-section-title">来源</view>
+      <view class="intel-detail-source-name">{{item.displaySource}}</view>
+      <button wx:if="{{item.displayOriginalUrl}}" class="intel-detail-link" bindtap="onCopyLink">复制原文链接</button>
+      <view wx:else class="intel-detail-unknown">原文链接未知</view>
+    </view>
+    <view wx:if="{{item.evidenceLinks && item.evidenceLinks.length}}" class="intel-detail-evidence">
+      <view class="intel-detail-section-title">证据链接</view>
+      <view wx:for="{{item.evidenceLinks}}" wx:key="*this" class="intel-detail-evidence-row">{{index + 1}}. {{item}}</view>
+    </view>
   </view>
 </view>

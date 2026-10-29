@@ -1,22 +1,51 @@
-<view class="wrap">
-  <view class="hero">
-    <view class="title">今日情报</view>
-    <view class="sub">AI、半导体与电子产业公开信息</view>
+<view class="intel-page">
+  <view class="intel-hero">
+    <view class="intel-eyebrow">INDUSTRY BRIEFING</view>
+    <view class="intel-heading">今日情报</view>
+    <view class="intel-subtitle">AI、半导体与电子产业公开信息</view>
+    <view wx:if="{{digestAtLabel}}" class="intel-updated">{{digestAtLabel}}</view>
   </view>
-  <view wx:if="{{demo}}" class="notice">演示数据 · 非真实资讯</view>
-  <view wx:elif="{{!enabled}}" class="notice">情报功能暂未开启</view>
-  <scroll-view class="filters" scroll-x>
-    <view wx:for="{{filters}}" wx:key="key" class="filter {{category === item.key ? 'on' : ''}}" data-category="{{item.key}}" bindtap="onSelectCategory">{{item.label}}</view>
-  </scroll-view>
-  <view wx:if="{{loading}}" class="state">正在加载…</view>
-  <view wx:elif="{{error}}" class="state">{{error}} <text class="retry" bindtap="onRetry">重试</text></view>
-  <view wx:elif="{{items.length === 0}}" class="state">暂时没有可展示的可信资讯。接入受控来源后会在这里显示。</view>
-  <view wx:else class="list">
-    <view wx:for="{{items}}" wx:key="id" class="item" data-id="{{item.id}}" bindtap="onOpenItem">
-      <view class="meta"><text class="tag">{{item.categoryLabel || item.category}}</text><text>{{item.sourceName || '来源未知'}}</text><text>{{item.publishedAt || '发布时间未知'}}</text></view>
-      <view class="item-title">{{item.title}}</view>
-      <view class="summary">{{item.summaryZh || '暂无摘要'}}</view>
-      <view class="summary-status">摘要状态：{{item.summaryStatus || '未知'}}</view>
+
+  <view wx:if="{{demo}}" class="intel-notice intel-notice-demo">演示内容 · 非真实资讯</view>
+  <view wx:elif="{{!enabled}}" class="intel-notice">情报功能暂未开启</view>
+
+  <block wx:if="{{enabled || demo}}">
+    <scroll-view class="intel-filters" scroll-x show-scrollbar="false">
+      <view wx:for="{{filters}}" wx:key="key" class="intel-filter {{category === item.key ? 'intel-filter-on' : ''}}" data-category="{{item.key}}" bindtap="onSelectCategory">{{item.label}}</view>
+    </scroll-view>
+
+    <view wx:if="{{loading && items.length === 0}}" class="intel-state">
+      <view class="intel-state-title">正在整理资讯</view><view class="intel-state-copy">请稍候片刻</view>
     </view>
-  </view>
+    <view wx:elif="{{error && items.length === 0}}" class="intel-state">
+      <view class="intel-state-title">暂时无法加载</view><view class="intel-state-copy">{{error}}</view>
+      <button class="intel-action" bindtap="onRetry">重试</button>
+    </view>
+    <view wx:elif="{{!loading && !error && items.length === 0}}" class="intel-state">
+      <view class="intel-state-mark">—</view>
+      <view class="intel-state-title">暂时没有可展示的资讯</view>
+      <view class="intel-state-copy">接入并核验公开来源后，资讯会显示在这里。</view>
+    </view>
+
+    <view wx:if="{{items.length > 0}}" class="intel-list">
+      <view wx:if="{{error}}" class="intel-inline-error">更新失败，仍显示上次加载的内容。<text class="intel-inline-link" bindtap="onRetry">重试</text></view>
+      <view wx:for="{{items}}" wx:key="id" class="intel-card" data-id="{{item.id}}" bindtap="onOpenItem">
+        <view class="intel-card-meta">
+          <text class="intel-category">{{item.categoryLabel}}</text>
+          <text class="intel-source">{{item.displaySource}}</text>
+        </view>
+        <view class="intel-card-title">{{item.title || '标题未知'}}</view>
+        <view class="intel-card-summary">{{item.displaySummary}}</view>
+        <view class="intel-card-footer">
+          <text>{{item.displayDate}}</text>
+          <text class="intel-summary-status">{{item.displaySummaryStatus}}</text>
+        </view>
+        <view class="intel-card-open">查看来源与详情 <text class="intel-arrow">›</text></view>
+      </view>
+      <view wx:if="{{loadingMore}}" class="intel-more-state">正在加载更多…</view>
+      <view wx:elif="{{moreError}}" class="intel-more-state">{{moreError}} <text class="intel-inline-link" bindtap="onRetryMore">重试</text></view>
+      <button wx:elif="{{nextCursor}}" class="intel-more-button" loading="{{loadingMore}}" disabled="{{loadingMore}}" bindtap="loadMore">加载更多</button>
+      <view wx:elif="{{!loading && !nextCursor}}" class="intel-end">已显示全部内容</view>
+    </view>
+  </block>
 </view>

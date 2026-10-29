@@ -31,6 +31,32 @@ async function backendContract () {
   assert.equal((await disabled.intelItem({ id: 'a-1' }, 'A')).error, 'feature_disabled')
 }
 
+async function signedPagination () {
+  let time = 100000
+  const key = 'test-only-cursor-key-with-at-least-32-bytes'
+  const rows = [
+    { id: 'older', category: 'ai', title: 'Older', publishedAt: '2026-01-01T00:00:00Z', status: 'published' },
+    { id: 'newer', category: 'ai', title: 'Newer', publishedAt: '2026-02-01T00:00:00Z', status: 'published' },
+    { id: 'newest', category: 'ai', title: 'Newest', publishedAt: '2026-03-01T00:00:00Z', status: 'published' }
+  ]
+  const handlers = createIntelHandlers({ enabled: true, cursorSecret: key, now: () => time, readItems: async () => rows })
+  const first = await handlers.intelFeed({ category: 'ai', limit: 1 }, 'owner-a')
+  assert.equal(first.items[0].id, 'newest')
+  assert.ok(first.nextCursor)
+  assert.equal((await handlers.intelFeed({ category: 'ai', limit: 1, cursor: first.nextCursor }, 'owner-a')).items[0].id, 'newer')
+  assert.equal((await handlers.intelFeed({ category: 'ai', limit: 1, cursor: first.nextCursor }, 'owner-b')).error, 'bad_request')
+  assert.equal((await handlers.intelFeed({ category: 'semiconductor', limit: 1, cursor: first.nextCursor }, 'owner-a')).error, 'bad_request')
+  assert.equal((await handlers.intelFeed({ category: 'ai', limit: 2, cursor: first.nextCursor }, 'owner-a')).error, 'bad_request')
+  rows.push({ id: 'inserted', category: 'ai', title: 'Changed snapshot', publishedAt: '2026-04-01T00:00:00Z', status: 'published' })
+  assert.equal((await handlers.intelFeed({ category: 'ai', limit: 1, cursor: first.nextCursor }, 'owner-a')).error, 'bad_request')
+  const expiring = await handlers.intelFeed({ category: 'ai', limit: 1 }, 'owner-a')
+  time += 15 * 60 * 1000 + 1
+  assert.equal((await handlers.intelFeed({ category: 'ai', limit: 1, cursor: expiring.nextCursor }, 'owner-a')).error, 'bad_request')
+  const noKey = createIntelHandlers({ enabled: true, readItems: async () => rows })
+  assert.equal((await noKey.intelFeed({ category: 'ai', limit: 1 }, 'owner-a')).error, 'server_error')
+  assert.equal((await noKey.intelFeed({ category: 'ai', limit: 1, cursor: first.nextCursor }, 'owner-a')).error, 'bad_request')
+}
+
 async function pageBehavior () {
   const pending = []
   const calls = []
@@ -118,6 +144,6 @@ async function apiRouteIdentity () {
   void root
 }
 
-Promise.resolve().then(backendContract).then(pageBehavior).then(apiRouteIdentity).then(() => {
+Promise.resolve().then(backendContract).then(signedPagination).then(pageBehavior).then(apiRouteIdentity).then(() => {
   process.stdout.write('InfoFlow contract, API route identity/default flag, page events/races/errors: PASS\n')
 }).catch(error => { console.error(error); process.exitCode = 1 })

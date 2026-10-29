@@ -204,6 +204,7 @@ const handlers = {}
 // Fixture-only first delivery. Enable explicitly with INTEL_ENABLED=true after review.
 Object.assign(handlers, intel.createIntelHandlers({
   enabled: process.env.INTEL_ENABLED === 'true',
+  cursorSecret: process.env.INFOFLOW_CURSOR_SECRET || '',
   readItems: () => intelFixtures
 }))
 handlers.publicJobsStatus = async () => {
