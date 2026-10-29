@@ -26,6 +26,16 @@
           <view class="digest-open">查看资讯详情 ›</view>
         </view>
       </view>
+      <view wx:if="{{jobItems.length}}" class="digest-jobs">
+        <view class="digest-section-title">你已关注的已核实岗位</view>
+        <view wx:for="{{jobItems}}" wx:key="companyId" class="digest-card digest-job-card" data-id="{{item.companyId}}" bindtap="onOpenJob">
+          <view class="digest-source">{{item.company}}</view>
+          <view class="digest-card-title">{{item.title}}</view>
+          <view class="digest-reason">{{item.reason}}</view>
+          <view class="digest-time">截止 {{item.deadline}}</view>
+          <view class="digest-open">查看岗位详情 ›</view>
+        </view>
+      </view>
     </view>
   </view>
 
@@ -44,6 +54,16 @@
             <view wx:if="{{item.reason}}" class="digest-reason">{{item.reason}}</view>
             <view wx:if="{{item.publishedAt}}" class="digest-time">{{item.publishedAt}}</view>
             <view class="digest-open">查看资讯详情 ›</view>
+          </view>
+        </view>
+        <view wx:if="{{historyJobItems.length}}" class="digest-jobs">
+          <view class="digest-section-title">你已关注的已核实岗位</view>
+          <view wx:for="{{historyJobItems}}" wx:key="companyId" class="digest-card digest-job-card" data-id="{{item.companyId}}" bindtap="onOpenJob">
+            <view class="digest-source">{{item.company}}</view>
+            <view class="digest-card-title">{{item.title}}</view>
+            <view class="digest-reason">{{item.reason}}</view>
+            <view class="digest-time">截止 {{item.deadline}}</view>
+            <view class="digest-open">查看岗位详情 ›</view>
           </view>
         </view>
       </view>

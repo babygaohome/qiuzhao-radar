@@ -12,7 +12,7 @@ function localParts (epochMs, timeZone) {
   return Object.fromEntries(parts.filter(part => part.type !== 'literal').map(part => [part.type, part.value]))
 }
 
-function createDigestService ({ resolveIdentity, readPreferences, readItems, snapshotStore, now = () => Date.now() } = {}) {
+function createDigestService ({ resolveIdentity, readPreferences, readItems, readJobs, snapshotStore, now = () => Date.now() } = {}) {
   for (const [name, value] of Object.entries({ resolveIdentity, readPreferences, readItems })) {
     if (typeof value !== 'function') throw new TypeError(`${name} must be a function`)
   }
@@ -50,12 +50,20 @@ function createDigestService ({ resolveIdentity, readPreferences, readItems, sna
       localDate, localTime, timeZone, preferences,
       items
     })
+    let jobCompanyIds = []
+    const jobWeight = preferences.topics && preferences.topics.jobs
+    if (typeof jobWeight === 'number' && Number.isFinite(jobWeight) && jobWeight > 0) {
+      if (typeof readJobs !== 'function') throw fail('jobs_unavailable')
+      const jobs = await readJobs(openid, { start: window.start, end: window.end, limit: 4 })
+      if (!Array.isArray(jobs) || jobs.length > 4 || jobs.some(job => !job || typeof job.companyId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(job.companyId))) throw fail('jobs_unavailable')
+      jobCompanyIds = [...new Set(jobs.map(job => job.companyId))].slice(0, 4)
+    }
     const snapshot = {
       localDate,
       timezone: timeZone,
       algorithmVersion: selected.algorithmVersion,
       itemIds: selected.itemIds,
-      jobCompanyIds: [],
+      jobCompanyIds,
       generatedAt: new Date(now()).toISOString(),
       status: 'ready',
       generation

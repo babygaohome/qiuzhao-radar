@@ -1,10 +1,13 @@
 'use strict'
 
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
+const crypto = require('node:crypto')
 const { createDigestJobsReader, verifiedRoles, toEpoch, beijingDateAt, beijingDeadlineDate, MAX_RESULTS, NO_DEADLINE_SENTINEL } = require('../cloudfunctions/api/intel/digest-jobs')
 
 const NOW = Date.parse('2026-10-29T12:00:00.000Z')
-const role = (overrides = {}) => ({ exists: true, cohort: 'matched', open: true, status: 'open', officialSource: 'confirmed', url: 'https://jobs.example.org/apply', ...overrides })
+const role = (overrides = {}) => ({ checkedAt: '2026-10-29T08:00:00.000Z', exists: true, cohort: 'matched', open: true, status: 'open', officialSource: 'confirmed', url: 'https://jobs.example.org/apply', ...overrides })
 const good = (id, overrides = {}) => ({
   _id: id, company: `Company ${id}`, source: 'auto', owner: undefined, publicOnly: false,
   disputed: false, manualReview: { status: 'verified' },
@@ -69,8 +72,15 @@ function makeDb (tables, failAt = null) {
 }
 
 async function run () {
+  const apiReader = fs.readFileSync(path.join(__dirname, '../cloudfunctions/api/intel/digest-jobs.js'))
+  const timerReader = fs.readFileSync(path.join(__dirname, '../cloudfunctions/intelDigest/digest-jobs.js'))
+  assert.equal(crypto.createHash('sha256').update(apiReader).digest('hex'), crypto.createHash('sha256').update(timerReader).digest('hex'), 'standalone and API readers must stay identical')
   assert.equal(MAX_RESULTS, 4)
   assert.equal(toEpoch('2026-02-30'), null)
+  assert.equal(toEpoch('2026-02-30T00:00:00.000Z'), null)
+  assert.equal(toEpoch('2026-10-29T25:00:00Z'), null)
+  assert.equal(toEpoch('2026-10-29T00:00:00+25:00'), null)
+  assert.equal(toEpoch('2026-10-29T08:00:00.000Z'), Date.parse('2026-10-29T08:00:00.000Z'))
   assert.equal(beijingDateAt(Date.parse('2026-10-29T15:30:00Z')), '2026-10-29')
   assert.equal(beijingDeadlineDate('2026-10-29'), '2026-10-29')
   assert.equal(beijingDeadlineDate(NO_DEADLINE_SENTINEL), null)
@@ -92,7 +102,7 @@ async function run () {
     good('hidden'),
     good('disputed', { disputed: true }),
     good('unverified', { catalogAudit: { state: 'partial', coverageComplete: false, coverageFingerprint: '', proofMethod: 'official_structured', jobs: { Engineer: role() } } }),
-    good('stale', { updated: '2026-10-20T08:00:00.000Z' }),
+    good('stale', { updated: '2026-10-20T08:00:00.000Z', catalogAudit: { state: 'verified', coverageComplete: true, coverageFingerprint: 'abc', proofMethod: 'official_structured', jobs: { Engineer: role({ checkedAt: '2026-10-20T08:00:00.000Z' }) } } }),
     good('deadline-today', { deadline: '2026-10-29', dl: '2026-10-29', updated: '2026-10-29T11:30:00.000Z' }),
     good('expired-deadline', { deadline: '2026-10-28', dl: '2026-10-28' }),
     good('unknown-deadline', { deadline: '', dl: '9999-12-31' }),
@@ -129,9 +139,38 @@ async function run () {
   assert.equal('education' in result[0], false)
   const bResult = await reader.read('B')
   assert.deepEqual(bResult.map(x => x.companyId), ['other-user'])
-  assert.deepEqual(await reader.read('A', { openid: 'B' }), result)
+  assert.deepEqual(await reader.read('A', { start: '2026-10-28T00:00:00.000Z', end: '2026-10-29T12:00:00.000Z', openid: 'B' }), result, 'window options cannot override server identity')
+  const windowReader = createDigestJobsReader({
+    db: makeDb({ apps: [{ _id: 'm1', openid: 'A', cid: 'deadline-today', status: 'want' }], companies: [good('deadline-today', { deadline: '2026-10-29', updated: '2026-10-29T08:00:00.000Z' })] }),
+    command: makeDb({}).command, buildWhere: () => ({}), readHidden: async () => [], now: () => NOW
+  })
+  assert.deepEqual(await windowReader.read('A', { start: '2026-10-28T00:00:00.000Z', end: '2026-10-28T08:00:00.000Z' }), [], 'jobs updated after the digest window are excluded even if the scheduler runs late')
+  await assert.rejects(windowReader.read('A', { start: '2026-10-28T00:00:00.000Z', end: '2026-10-29T13:00:00.000Z' }), error => error.code === 'invalid_window')
 
-  const midnightCompany = good('midnight', { deadline: '2026-10-29', dl: '2026-10-29', updated: '2026-10-28T16:30:00.000Z' })
+  const oldCompanyNewRole = good('old-company-new-role', {
+    updated: '2026-10-20T08:00:00.000Z',
+    catalogAudit: { state: 'verified', coverageComplete: true, coverageFingerprint: 'fp', proofMethod: 'official_structured', jobs: { Engineer: role({ checkedAt: '2026-10-29T10:00:00.000Z' }) } }
+  })
+  const newCompanyOldRole = good('new-company-old-role', {
+    updated: '2026-10-29T10:00:00.000Z',
+    catalogAudit: { state: 'verified', coverageComplete: true, coverageFingerprint: 'fp', proofMethod: 'official_structured', jobs: { Engineer: role({ checkedAt: '2026-10-28T10:00:00.000Z' }) } }
+  })
+  const missingRoleTime = good('missing-role-time', {
+    catalogAudit: { state: 'verified', coverageComplete: true, coverageFingerprint: 'fp', proofMethod: 'official_structured', jobs: { Engineer: role({ checkedAt: undefined }) } }
+  })
+  const roleWindow = createDigestJobsReader({
+    db: makeDb({
+      apps: ['old-company-new-role', 'new-company-old-role', 'missing-role-time'].map((cid, i) => ({ _id: `r${i}`, openid: 'A', cid, status: 'want' })),
+      companies: [oldCompanyNewRole, newCompanyOldRole, missingRoleTime]
+    }),
+    command: makeDb({}).command,
+    buildWhere: () => ({}),
+    readHidden: async () => [],
+    now: () => NOW
+  })
+  assert.deepEqual((await roleWindow.read('A')).map(x => x.companyId), ['old-company-new-role'], 'the per-role verification time, not a company update, controls freshness')
+
+  const midnightCompany = good('midnight', { deadline: '2026-10-29', dl: '2026-10-29', updated: '2026-10-28T16:30:00.000Z', catalogAudit: { state: 'verified', coverageComplete: true, coverageFingerprint: 'abc', proofMethod: 'official_structured', jobs: { Engineer: role({ checkedAt: '2026-10-28T16:30:00.000Z' }) } } })
   const midnightReader = createDigestJobsReader({
     db: makeDb({ apps: [{ _id: 'm1', openid: 'A', cid: 'midnight', status: 'want' }], companies: [midnightCompany] }),
     command: makeDb({}).command,

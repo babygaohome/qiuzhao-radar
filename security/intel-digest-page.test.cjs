@@ -50,6 +50,7 @@ async function run () {
   assert.equal(page.data.items.length, 1)
   assert.equal(page.data.items[0].title, 'Real title')
   assert.equal(page.data.empty, false)
+  assert.deepEqual(page.data.jobItems, [])
   assert.equal(page.data.contractNotice.includes('逐步开放'), true)
   page.onOpenItem({ currentTarget: { dataset: { id: 'item-1' } } })
   assert.equal(page.data.items[0].itemId, 'item-1')
@@ -200,13 +201,24 @@ async function run () {
   assert.equal(historyToday.data.historyLoading, false)
 
   const detail = []
-  const open = makePage(async () => ({ digest: { localDate: '2026-10-29', items: [] } }), { navigateTo: value => detail.push(value.url) })
+  const open = makePage(async () => ({ digest: { localDate: '2026-10-29', items: [], jobItems: [
+    { companyId: 'company-1', company: '示例企业', title: '已核实岗位', deadline: '2026-10-31', reason: '你已关注的已核实岗位近期有更新' },
+    { companyId: 'company-2', company: '缺截止日期', title: '岗位', reason: '已核实' },
+    { companyId: 'company-3', company: '未知截止日期', title: '岗位', deadline: '9999-12-31', reason: '已核实' },
+    { companyId: '../bad', company: '伪造 ID', title: '岗位', deadline: '2026-10-31', reason: '已核实' }
+  ] } }), { navigateTo: value => detail.push(value.url) })
+  open.onLoad(); await tick()
+  assert.equal(open.data.jobItems.length, 1, 'only explicit, complete and safe job fields are rendered')
+  assert.equal(open.data.jobItems[0].companyId, 'company-1')
+  open.onOpenJob({ currentTarget: { dataset: { id: '../bad' } } })
+  open.onOpenJob({ currentTarget: { dataset: { id: 'company-1' } } })
+  assert.deepEqual(detail, ['/pages/detail/detail?id=company-1'])
   open.onOpenItem({ currentTarget: { dataset: { id: '../bad' } } })
   open.onOpenItem({ currentTarget: { dataset: { id: 'news:1' } } })
-  assert.deepEqual(detail, ['/pages/intel-detail/detail?id=news%3A1'])
+  assert.deepEqual(detail, ['/pages/detail/detail?id=company-1', '/pages/intel-detail/detail?id=news%3A1'])
 
   const markup = fs.readFileSync(path.join(root, 'miniprogram/pages/intel-digest/index.wxml'), 'utf8')
-  assert.doesNotMatch(markup, /微信通知|邮件推送|示例资讯/)
+  assert.doesNotMatch(markup, /微信通知|邮件推送|示例资讯|学历符合/)
   const app = JSON.parse(fs.readFileSync(path.join(root, 'miniprogram/app.json'), 'utf8'))
   assert.equal(app.pages.includes('pages/intel-digest/index'), true, 'digest page is registered')
 

@@ -25,6 +25,15 @@ function validHttpsUrl (value) {
 
 function toEpoch (value) {
   if (typeof value !== 'string' || !value) return null
+  const dateTime = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,3})?(Z|([+-])(\d{2}):(\d{2}))$/.exec(value)
+  if (dateTime) {
+    const [, yearText, monthText, dayText, hourText, minuteText, secondText, , , offsetHourText, offsetMinuteText] = dateTime
+    const year = Number(yearText), month = Number(monthText), day = Number(dayText)
+    const calendarDate = new Date(Date.UTC(year, month - 1, day))
+    if (calendarDate.getUTCFullYear() !== year || calendarDate.getUTCMonth() !== month - 1 || calendarDate.getUTCDate() !== day ||
+        Number(hourText) > 23 || Number(minuteText) > 59 || Number(secondText) > 59 ||
+        (offsetHourText !== undefined && (Number(offsetHourText) > 23 || Number(offsetMinuteText) > 59))) return null
+  } else if (/^\d{4}-\d{2}-\d{2}T/.test(value)) return null
   const epoch = Date.parse(value)
   if (!Number.isFinite(epoch)) return null
   if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
@@ -70,11 +79,18 @@ function createDigestJobsReader ({ db, command, buildWhere, readHidden, now = ()
   if (!db || typeof db.collection !== 'function' || !command || typeof command.in !== 'function' || typeof command.and !== 'function' || typeof command.gt !== 'function') throw new TypeError('database_required')
   if (typeof buildWhere !== 'function' || typeof readHidden !== 'function') throw new TypeError('existing_visibility_filters_required')
 
-  async function read (serverOpenid) {
+  async function read (serverOpenid, window = null) {
     if (typeof serverOpenid !== 'string' || !serverOpenid.trim() || serverOpenid.length > 128) throw fail('unauthenticated')
     const checkedAt = now()
     if (!Number.isFinite(checkedAt)) throw fail('invalid_clock')
-    const start = checkedAt - WINDOW_MS
+    let start = checkedAt - WINDOW_MS
+    if (window !== null) {
+      if (!window || typeof window !== 'object') throw fail('invalid_window')
+      start = toEpoch(window.start)
+      const windowEnd = toEpoch(window.end)
+      if (start === null || windowEnd === null || windowEnd <= start || windowEnd > checkedAt) throw fail('invalid_window')
+    }
+    const eligibleAt = window === null ? checkedAt : toEpoch(window.end)
     const hidden = await readHidden(serverOpenid)
     if (!Array.isArray(hidden) || hidden.some(id => typeof id !== 'string')) throw fail('visibility_unavailable')
     // Inject the exact existing company-list filter; this preserves the product's
@@ -126,11 +142,12 @@ function createDigestJobsReader ({ db, command, buildWhere, readHidden, now = ()
         if (!isRecord(company) || !appIds.has(company._id)) continue
         const rawDeadline = typeof company.deadline === 'string' && company.deadline ? company.deadline : company.dl
         const deadlineValue = beijingDeadlineDate(rawDeadline)
-        if (deadlineValue === null || deadlineValue < beijingDateAt(checkedAt)) continue
-        const updated = Math.max(toEpoch(company.updated) || 0, toEpoch(company.addedAt) || 0)
-        if (!updated || updated < start || updated > checkedAt) continue
+        if (deadlineValue === null || deadlineValue < beijingDateAt(eligibleAt)) continue
         if (typeof company.company !== 'string' || !company.company.trim()) continue
         for (const [title, role] of verifiedRoles(company)) {
+          const checkedAt = toEpoch(role.checkedAt)
+          if (checkedAt === null || checkedAt < start || checkedAt > eligibleAt ||
+              typeof role.checkedAt !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(role.checkedAt)) continue
           const originalUrl = validHttpsUrl(role.url)
           if (!originalUrl) continue
           candidates.push({
@@ -140,18 +157,18 @@ function createDigestJobsReader ({ db, command, buildWhere, readHidden, now = ()
             deadline: deadlineValue,
             originalUrl,
             reason: '你标记的已核实岗位',
-            updatedAt: new Date(updated).toISOString()
+            checkedAt: new Date(checkedAt).toISOString()
           })
         }
       }
     }
-    candidates.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt) || a.companyId.localeCompare(b.companyId) || a.title.localeCompare(b.title))
+    candidates.sort((a, b) => Date.parse(b.checkedAt) - Date.parse(a.checkedAt) || a.companyId.localeCompare(b.companyId) || a.title.localeCompare(b.title))
     const seen = new Set()
     return candidates.filter(candidate => {
       if (seen.has(candidate.companyId)) return false
       seen.add(candidate.companyId)
       return true
-    }).slice(0, MAX_RESULTS).map(({ updatedAt, ...candidate }) => candidate)
+    }).slice(0, MAX_RESULTS).map(({ checkedAt, ...candidate }) => candidate)
   }
 
   return { read }

@@ -1,7 +1,7 @@
 'use strict'
 
 const assert = require('node:assert/strict')
-const { createMain, validTimerEnvelope, safeTimerResult, readPublicWindow, TRIGGER_NAME, MAX_WINDOW_ITEMS } = require('../cloudfunctions/intelDigest')
+const { createMain, validTimerEnvelope, safeTimerResult, readPublicWindow, createReadHidden, TRIGGER_NAME, MAX_WINDOW_ITEMS } = require('../cloudfunctions/intelDigest')
 
 function fakeCloud ({ context = {}, db } = {}) {
   const calls = { init: 0, database: 0, getWXContext: 0 }
@@ -15,7 +15,7 @@ function fakeCloud ({ context = {}, db } = {}) {
 }
 function fakeDb () {
   return {
-    command: { gt: () => ({}) },
+    command: { gt: () => ({}), and: () => ({}), or: () => ({}), neq: () => ({}), gte: () => ({}), exists: () => ({}), in: () => ({}), nin: () => ({}) },
     runTransaction: async fn => fn({ collection: () => ({}) }),
     collection: () => ({})
   }
@@ -84,6 +84,13 @@ async function main () {
   assert.equal(runtimeError.calls.database, 0)
   const initFailure = createMain({ processEnv: { INTEL_DIGEST_ENABLED: 'true' }, loadCloud: () => ({ init () { throw new Error('private runtime error') } }) })
   assert.deepEqual(await initFailure(timer(), {}), { status: 'failed', processed: 0, skipped: 0, failed: 0 })
+
+  const hiddenDb = { collection (name) { assert.equal(name, 'profiles'); return { where (query) { assert.deepEqual(query, { _id: 'A' }); return { field (fields) { assert.deepEqual(fields, { hidden: true }); return { limit (n) { assert.equal(n, 1); return { get: async () => ({ data: [] }) } } } } } } } } }
+  assert.deepEqual(await createReadHidden(hiddenDb)('A'), [], 'missing profile is an empty hidden list')
+  const legacyDb = { collection: () => ({ where: () => ({ field: () => ({ limit: () => ({ get: async () => ({ data: [{ _id: 'A' }] }) }) }) }) }) }
+  assert.deepEqual(await createReadHidden(legacyDb)('A'), [], 'unset legacy hidden field is empty')
+  const invalidHiddenDb = { collection: () => ({ where: () => ({ field: () => ({ limit: () => ({ get: async () => ({ data: [{ _id: 'A', hidden: 'broken' }] }) }) }) }) }) }
+  await assert.rejects(createReadHidden(invalidHiddenDb)('A'), error => error.code === 'visibility_unavailable', 'malformed hidden data fails closed')
 
   const publicRows = Array.from({ length: MAX_WINDOW_ITEMS }, (_, index) => ({ _id: `item-${String(index).padStart(3, '0')}`, status: 'published', privateNote: 'must not be selected' }))
   const projections = []

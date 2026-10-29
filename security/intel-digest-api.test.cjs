@@ -113,6 +113,7 @@ async function run () {
   check(DIGEST_ENABLED_ENV === 'INTEL_DIGEST_ENABLED', 'feature gate uses a server-only environment variable')
   check(digestId(A, today, 2, 1, ZONE) === snapshotDigestId(A, today, 2, 1, ZONE), 'API and snapshot writer derive the same private key')
   const snapA = snapshot(A, today)
+  snapA.jobCompanyIds = ['verified-company', 'hidden-company', 'expired-company']
   db.put('intel_digests', snapA._id, snapA)
   db.put('intel_digests', snapshot(B, today, { timezone: 'Pacific/Auckland' })._id,
     snapshot(B, today, { timezone: 'Pacific/Auckland', itemIds: ['b-item'] }))
@@ -120,16 +121,48 @@ async function run () {
   db.put('intel_items', 'item-2', item('item-2', { privateNote: 'secret two' }))
   db.put('intel_items', 'other-account-private', item('other-account-private', { sourceIds: ['unapproved-source'] }))
 
-  const handlers = createDigestHandlers({ db, now: () => now })
+  let jobLoadCalls = 0
+  let requestedJobIdentity = ''
+  const safeJob = {
+    companyId: 'verified-company', title: '已核验工程师', company: '公开企业', deadline: '2026-10-31',
+    originalUrl: 'https://example.com/jobs/1', reason: '你标记的已核实岗位', privateNote: 'must not escape'
+  }
+  const loadJobItems = async (openid, ids) => {
+    jobLoadCalls++
+    requestedJobIdentity = openid
+    assert.deepEqual(ids, ['verified-company', 'hidden-company', 'expired-company'])
+    return [safeJob]
+  }
+  const handlers = createDigestHandlers({ db, now: () => now, loadJobItems })
   check(validTimestamp('2026-02-30T01:00:00Z') === null, 'invalid calendar timestamps are rejected')
   const todayResult = await handlers.intelDigestToday({ openid: B }, A)
   check(todayResult.digest.localDate === today, 'date uses server supplied timezone and current time')
   check(todayResult.digest.items.map(x => x.itemId).join(',') === 'item-2,item-1', 'saved ordering is preserved')
-  check(todayResult.digest.jobItems.length === 0, 'no fabricated job entries')
+  check(todayResult.digest.jobItems.length === 1 && todayResult.digest.jobItems[0].companyId === 'verified-company', 'only currently revalidated snapshot companies are shown')
+  check(requestedJobIdentity === A, 'job loader receives only server supplied identity')
+  check(!JSON.stringify(todayResult.digest.jobItems).includes('privateNote'), 'job private fields are omitted')
+  check(jobLoadCalls === 1, 'job loader only runs for snapshots with jobs')
   check(!JSON.stringify(todayResult).includes('privateNote'), 'private item fields are omitted')
   check(todayResult.digest.items.every(x => x.reason === '近期资讯'), 'reason is factual static text')
   const byDate = await handlers.intelDigestByDate({ localDate: today, openid: B }, A)
   check(byDate.digest.localDate === today && byDate.digest.items.map(x => x.itemId).join(',') === 'item-2,item-1', 'by-date reuses scoped snapshot and ignores event identity')
+  check(byDate.digest.jobItems.length === 1 && byDate.digest.jobItems[0].companyId === 'verified-company', 'by-date jobs are revalidated for server user')
+  for (const malformedIds of [undefined, 'verified-company', ['verified-company', 'verified-company'], ['a', 'b', 'c', 'd', 'e']]) {
+    const malformedDb = createDb()
+    malformedDb.put('intel_preferences', A, preference())
+    const malformedSnapshot = snapshot(A, today, { itemIds: [], jobCompanyIds: ['verified-company'] })
+    if (malformedIds === undefined) delete malformedSnapshot.jobCompanyIds
+    else malformedSnapshot.jobCompanyIds = malformedIds
+    malformedDb.put('intel_digests', malformedSnapshot._id, malformedSnapshot)
+    let malformedJobReads = 0
+    const malformedHandlers = createDigestHandlers({
+      db: malformedDb,
+      now: () => now,
+      loadJobItems: async () => { malformedJobReads++; return [] }
+    })
+    await assert.rejects(malformedHandlers.intelDigestToday({}, A), error => error && error.code === 'server_error')
+    check(malformedJobReads === 0, 'corrupt job company IDs fail before calling the private-data reader')
+  }
   check((await handlers.intelDigestByDate({ localDate: '2026-10-28' }, A)).digest === null, 'missing historical date returns empty snapshot')
   await assert.rejects(handlers.intelDigestByDate({ localDate: '2026-02-30' }, A), error => error && error.code === 'bad_request')
   checks++
@@ -143,7 +176,9 @@ async function run () {
   const disabledHistory = await disabled.intelDigestHistory({ openid: B }, A)
   check(disabledToday.error === 'feature_disabled' && disabledByDate.error === 'feature_disabled' && disabledHistory.error === 'feature_disabled', 'disabled digest routes return a feature flag response')
   check(disabledTouches === 0, 'disabled digest routes do not access collections')
-  const gated = createDigestFeatureHandlers({ enabled: true, db, now: () => now })
+  const disabledJobs = createDigestFeatureHandlers({ enabled: false, loadJobItems () { throw new Error('disabled feature must not read jobs') }, db })
+  check((await disabledJobs.intelDigestToday({}, A)).error === 'feature_disabled', 'disabled jobs route is inert')
+  const gated = createDigestFeatureHandlers({ enabled: true, db, now: () => now, loadJobItems })
   const gatedResult = await gated.intelDigestToday({ openid: B }, A)
   check(gatedResult.digest.localDate === today, 'enabled feature router uses the server supplied identity over request data')
   const gatedByDate = await gated.intelDigestByDate({ openid: B, localDate: today }, A)
@@ -151,7 +186,7 @@ async function run () {
 
   const history = await handlers.intelDigestHistory({ openid: B }, A)
   check(history.digests.length === 1 && history.digests[0].localDate === today, 'request event identity cannot substitute for server identity')
-  check(history.digests[0].itemCount === 2 && history.nextCursor === null, 'history exposes bounded summary only')
+  check(history.digests[0].itemCount === 5 && history.nextCursor === null, 'history exposes bounded summary only')
 
   for (let offset = 1; offset <= 65; offset++) {
     const date = new Date(Date.UTC(2026, 9, 29 - offset)).toISOString().slice(0, 10)
@@ -202,6 +237,8 @@ async function run () {
 
   db.put('intel_preferences', A, preference({ dailyDigestEnabled: false }))
   check((await handlers.intelDigestToday({}, A)).digest === null, 'disabled digest returns no content')
+  const previousCalls = jobLoadCalls
+  check((await handlers.intelDigestToday({}, A)).digest === null && jobLoadCalls === previousCalls, 'disabled digest never reads jobs')
   check((await handlers.intelDigestHistory({}, A)).digests.length === 0, 'disabled digest hides history')
   const originalCollection = db.collection.bind(db)
   db.collection = name => {

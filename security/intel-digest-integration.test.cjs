@@ -112,10 +112,59 @@ function makePreference (openid, patch = {}) {
 
 async function run () {
   const db = createDb()
-  db.put('intel_preferences', 'account-a', makePreference('account-a'))
-  db.put('intel_preferences', 'account-b', makePreference('account-b'))
+  db.put('intel_preferences', 'account-a', makePreference('account-a', { topics: { ai: 0.35, jobs: 0.4 } }))
+  db.put('intel_preferences', 'account-b', makePreference('account-b', { topics: { jobs: 0.4 } }))
   db.put('intel_items', 'release-a', makeItem('release-a'))
   db.put('intel_items', 'release-b', makeItem('release-b'))
+
+  // Existing apps are the user's explicit job shortlist. The adapter keeps
+  // the app ownership, visibility, role-audit, and deadline gates together.
+  db.put('profiles', 'account-a', { hidden: ['hidden-a'] })
+  db.put('profiles', 'account-b', { hidden: [] })
+  for (const app of [
+    { _id: 'app-a', openid: 'account-a', cid: 'verified-a', status: 'want' },
+    { _id: 'app-hidden', openid: 'account-a', cid: 'hidden-a', status: 'want' },
+    { _id: 'app-unverified', openid: 'account-a', cid: 'unverified-a', status: 'want' },
+    { _id: 'app-expired', openid: 'account-a', cid: 'expired-a', status: 'want' },
+    { _id: 'app-b', openid: 'account-b', cid: 'verified-b', status: 'want' }
+  ]) db.put('apps', app._id, app)
+  const verified = company => ({
+    source: 'auto', company, deadline: '2026-10-31', url: 'https://jobs.example.org/apply',
+    positions: ['软件工程师'], catalogAudit: {
+      state: 'verified', coverageComplete: true, coverageFingerprint: 'sha256-fixture',
+      proofMethod: 'browser_official'
+    }
+  })
+  db.put('companies', 'verified-a', { _id: 'verified-a', ...verified('甲企业') })
+  db.put('companies', 'verified-b', { _id: 'verified-b', ...verified('乙企业') })
+  db.put('companies', 'hidden-a', { _id: 'hidden-a', ...verified('隐藏企业') })
+  db.put('companies', 'unverified-a', { _id: 'unverified-a', ...verified('未核验企业'), catalogAudit: { state: 'pending' } })
+  db.put('companies', 'expired-a', { _id: 'expired-a', ...verified('过期企业'), deadline: '2026-10-28' })
+  db.put('companies', 'private-b', { _id: 'private-b', source: 'manual', owner: 'account-b', company: '乙私有企业', deadline: '2026-10-31', url: 'https://jobs.example.org/private', positions: ['工程师'], catalogAudit: { state: 'verified', coverageComplete: true, coverageFingerprint: 'private', proofMethod: 'browser_official' } })
+
+  function readOwnedVerifiedJobs (openid, window, companyIds) {
+    const profile = db.rows('profiles').find(row => row._id === openid) || {}
+    const hidden = new Set(profile.hidden || [])
+    const applications = db.rows('apps').filter(app => app.openid === openid && ['want', 'applied', 'test', 'interview', 'offer'].includes(app.status))
+    const rows = []
+    for (const app of applications) {
+      if (companyIds && !companyIds.includes(app.cid)) continue
+      if (hidden.has(app.cid)) continue
+      const company = db.rows('companies').find(row => row._id === app.cid)
+      if (!company || (company.source === 'manual' && company.owner !== openid)) continue
+      const audit = company.catalogAudit || {}
+      if (company.disputed === true || audit.state !== 'verified' || audit.coverageComplete !== true ||
+        !audit.coverageFingerprint || !['browser_official', 'official_structured'].includes(audit.proofMethod)) continue
+      if (company.manualReview && ['expired', 'unconfirmed'].includes(company.manualReview.status)) continue
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(company.deadline) || company.deadline <= window.start.slice(0, 10)) continue
+      const title = Array.isArray(company.positions) ? company.positions.find(Boolean) : null
+      if (!title) continue
+      rows.push({ companyId: company._id, title, company: company.company,
+        deadline: company.deadline, originalUrl: company.url, reason: '你标记的已核实岗位' })
+      if (rows.length >= 4) break
+    }
+    return rows
+  }
 
   const store = createSnapshotStore({ db, now: () => new Date(NOW).toISOString() })
   const service = createDigestService({
@@ -127,10 +176,11 @@ async function run () {
     readItems: async ({ start, end }) => {
       return db.rows('intel_items').filter(item => Date.parse(item.publishedAt) >= Date.parse(start) && Date.parse(item.publishedAt) <= Date.parse(end))
     },
+    readJobs: async (openid, window) => readOwnedVerifiedJobs(openid, window),
     snapshotStore: store,
     now: () => NOW
   })
-  const readHandlers = createDigestHandlers({ db, now: () => NOW })
+  const readHandlers = createDigestHandlers({ db, now: () => NOW, loadJobItems: (openid, ids) => readOwnedVerifiedJobs(openid, { start: '2026-10-29T00:00:00.000Z' }, ids) })
 
   const generated = await service.generate({}, { authenticatedOpenid: 'account-a' })
   assert.equal(generated.created, true)
@@ -138,21 +188,36 @@ async function run () {
   assert.equal(generated.snapshot.localDate, '2026-10-29')
   assert.equal(generated.snapshot.timezone, ZONE)
   assert.equal('openid' in generated.snapshot, false)
+  assert.deepEqual(generated.snapshot.jobCompanyIds, ['verified-a'])
+
+  const generatedB = await service.generate({}, { authenticatedOpenid: 'account-b' })
+  assert.deepEqual(generatedB.snapshot.jobCompanyIds, ['verified-b'])
 
   const todayA = await readHandlers.intelDigestToday({}, 'account-a')
   assert.deepEqual(todayA.digest.items.map(item => item.itemId), generated.snapshot.itemIds)
   assert.deepEqual(todayA.digest.items.map(item => item.title), ['Release release-a', 'Release release-b'])
   assert.equal(todayA.digest.items[0].reason, '近期资讯')
+  assert.deepEqual(todayA.digest.jobItems, [{
+    companyId: 'verified-a',
+    title: '软件工程师',
+    company: '甲企业',
+    deadline: '2026-10-31',
+    originalUrl: 'https://jobs.example.org/apply',
+    reason: '你标记的已核实岗位'
+  }])
+  assert.deepEqual(Object.keys(todayA.digest.jobItems[0]).sort(),
+    ['companyId', 'title', 'company', 'deadline', 'originalUrl', 'reason'].sort())
   const historyA = await readHandlers.intelDigestHistory({}, 'account-a')
-  assert.deepEqual(historyA.digests, [{ localDate: '2026-10-29', itemCount: 2, generatedAt: generated.snapshot.generatedAt }])
+  assert.deepEqual(historyA.digests, [{ localDate: '2026-10-29', itemCount: 3, generatedAt: generated.snapshot.generatedAt }])
   const dateA = await readHandlers.intelDigestByDate({ localDate: '2026-10-29', openid: 'account-a' }, 'account-a')
   assert.deepEqual(dateA, todayA)
 
   // A request body cannot substitute a different account's identity.
   const todayB = await readHandlers.intelDigestToday({ openid: 'account-a' }, 'account-b')
-  assert.equal(todayB.digest, null)
-  assert.deepEqual(await readHandlers.intelDigestHistory({}, 'account-b'), { digests: [], nextCursor: null })
-  assert.equal((await service.getMine({ authenticatedOpenid: 'account-b' }, '2026-10-29')), null)
+  assert.deepEqual(todayB.digest.jobItems.map(item => item.companyId), ['verified-b'])
+  assert.equal(todayB.digest.jobItems.some(item => item.companyId === 'verified-a'), false)
+  assert.deepEqual((await readHandlers.intelDigestHistory({}, 'account-b')).digests.map(row => row.itemCount), [1])
+  assert.equal((await service.getMine({ authenticatedOpenid: 'account-b' }, '2026-10-29')).itemIds.length, 0)
 
   // A closed and re-enabled digest gets a new generation; the prior snapshot is not visible.
   const prefA = db.rows('intel_preferences').find(row => row._id === 'account-a')

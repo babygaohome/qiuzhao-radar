@@ -10,6 +10,9 @@
 .digest-tab-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 650; }
 .digest-date { margin: 18rpx 4rpx; color: var(--muted); font-size: 22rpx; }
 .digest-list, .digest-history-list { display: flex; flex-direction: column; gap: 14rpx; }
+.digest-jobs { display: flex; flex-direction: column; gap: 14rpx; margin-top: 28rpx; }
+.digest-section-title { padding: 0 4rpx 4rpx; color: var(--ink); font-size: 25rpx; font-weight: 650; }
+.digest-job-card { border-left: 6rpx solid var(--accent); }
 .digest-card, .digest-history-card { padding: 22rpx; }
 .digest-source, .digest-history-count { color: var(--muted); font-size: 20rpx; }
 .digest-card-title { margin-top: 12rpx; color: var(--ink); font-size: 28rpx; line-height: 1.5; font-weight: 650; }

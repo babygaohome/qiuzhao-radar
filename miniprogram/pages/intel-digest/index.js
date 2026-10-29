@@ -22,6 +22,22 @@ function presentDigestItem (item) {
   }
 }
 
+function presentDigestJob (item) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return null
+  const companyId = typeof item.companyId === 'string' ? item.companyId : ''
+  const company = typeof item.company === 'string' ? item.company.trim() : ''
+  const title = typeof item.title === 'string' ? item.title.trim() : ''
+  const deadline = typeof item.deadline === 'string' ? item.deadline.trim() : ''
+  const reason = typeof item.reason === 'string' ? item.reason.trim() : ''
+  if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(companyId) || !company || company.length > 180 || !title || title.length > 180 || !reason || reason.length > 160) return null
+  if (!deadline || deadline === '9999-12-31' || /未公布|未知|不详|无明确|滚动|招满/i.test(deadline)) return null
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(deadline)) return null
+  const [year, month, day] = deadline.split('-').map(Number)
+  const parsed = new Date(Date.UTC(year, month - 1, day))
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) return null
+  return { companyId, company, title, deadline, reason }
+}
+
 const pageDefinition = {
   data: {
     tab: 'today',
@@ -30,6 +46,7 @@ const pageDefinition = {
     empty: false,
     digest: null,
     items: [],
+    jobItems: [],
     histories: [],
     historyError: '',
     historyLoading: false,
@@ -40,6 +57,7 @@ const pageDefinition = {
     historyLocalDate: '',
     historyDigest: null,
     historyItems: [],
+    historyJobItems: [],
     historyDetailLoading: false,
     historyDetailError: '',
     historyDetailEmpty: false,
@@ -88,10 +106,11 @@ const pageDefinition = {
       if (!this.alive || seq !== this.todaySeq) return
       const raw = result && result.digest
       const items = raw && Array.isArray(raw.items) ? raw.items.map(presentDigestItem).filter(Boolean) : []
+      const jobItems = raw && Array.isArray(raw.jobItems) ? raw.jobItems.map(presentDigestJob).filter(Boolean) : []
       const digest = raw && typeof raw.localDate === 'string'
         ? { localDate: formatDate(raw.localDate), generatedAt: typeof raw.generatedAt === 'string' ? raw.generatedAt : '' }
         : null
-      this.setData({ digest, items, empty: !digest || items.length === 0, loading: false, error: '' })
+      this.setData({ digest, items, jobItems, empty: !digest || items.length + jobItems.length === 0, loading: false, error: '' })
     } catch (error) {
       if (!this.alive || seq !== this.todaySeq) return
       this.setData({ loading: false, error: (error && error.message) || '暂时无法加载今日简报' })
@@ -137,13 +156,13 @@ const pageDefinition = {
     const localDate = event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.date
     if (!this.alive || typeof localDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(localDate) || this.data.historyDetailLoading) return
     this.historySeq = (this.historySeq || 0) + 1
-    this.setData({ historyMoreLoading: false, historyMoreError: '', historyLocalDate: localDate, historyDigest: null, historyItems: [], historyDetailError: '', historyDetailEmpty: false })
+    this.setData({ historyMoreLoading: false, historyMoreError: '', historyLocalDate: localDate, historyDigest: null, historyItems: [], historyJobItems: [], historyDetailError: '', historyDetailEmpty: false })
     this.loadHistoryDate(localDate)
   },
 
   onBackToHistory () {
     this.historyDetailSeq = (this.historyDetailSeq || 0) + 1
-    this.setData({ historyLocalDate: '', historyDigest: null, historyItems: [], historyDetailLoading: false, historyDetailError: '', historyDetailEmpty: false })
+    this.setData({ historyLocalDate: '', historyDigest: null, historyItems: [], historyJobItems: [], historyDetailLoading: false, historyDetailError: '', historyDetailEmpty: false })
   },
 
   async loadHistoryDate (localDate) {
@@ -155,10 +174,11 @@ const pageDefinition = {
       if (!this.alive || seq !== this.historyDetailSeq || this.data.historyLocalDate !== localDate) return
       const raw = result && result.digest
       const items = raw && Array.isArray(raw.items) ? raw.items.map(presentDigestItem).filter(Boolean) : []
+      const jobItems = raw && Array.isArray(raw.jobItems) ? raw.jobItems.map(presentDigestJob).filter(Boolean) : []
       const digest = raw && raw.localDate === localDate
         ? { localDate: formatDate(raw.localDate), generatedAt: typeof raw.generatedAt === 'string' ? raw.generatedAt : '' }
         : null
-      this.setData({ historyDigest: digest, historyItems: items, historyDetailEmpty: !digest || !items.length, historyDetailLoading: false, historyDetailError: '' })
+      this.setData({ historyDigest: digest, historyItems: items, historyJobItems: jobItems, historyDetailEmpty: !digest || items.length + jobItems.length === 0, historyDetailLoading: false, historyDetailError: '' })
     } catch (error) {
       if (!this.alive || seq !== this.historyDetailSeq || this.data.historyLocalDate !== localDate) return
       this.setData({ historyDetailLoading: false, historyDetailError: (error && error.message) || '暂时无法加载这一天的简报' })
@@ -185,6 +205,12 @@ const pageDefinition = {
     const id = event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.id
     if (typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(id)) return
     wx.navigateTo({ url: `/pages/intel-detail/detail?id=${encodeURIComponent(id)}` })
+  },
+
+  onOpenJob (event) {
+    const id = event && event.currentTarget && event.currentTarget.dataset && event.currentTarget.dataset.id
+    if (typeof id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(id)) return
+    wx.navigateTo({ url: `/pages/detail/detail?id=${encodeURIComponent(id)}` })
   }
 }
 
@@ -196,4 +222,4 @@ function normalizeHistoryRows (rows) {
 
 Page(pageDefinition)
 
-module.exports = { pageDefinition, presentDigestItem, formatDate, normalizeHistoryRows }
+module.exports = { pageDefinition, presentDigestItem, presentDigestJob, formatDate, normalizeHistoryRows }

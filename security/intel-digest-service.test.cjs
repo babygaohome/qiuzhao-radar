@@ -8,7 +8,7 @@ function sourceItem (id = 'release-a') {
 }
 
 function setup (options = {}) {
-  const calls = { preferences: [], feeds: [], saves: [], reads: [] }
+  const calls = { preferences: [], feeds: [], jobs: [], saves: [], reads: [] }
   const preferences = options.preferences || { dailyDigestEnabled: true, timezone: 'Asia/Shanghai', digestLocalTime: '08:00', generation: 2, digestGeneration: 7, topics: { ai: 0.35 } }
   const saved = new Map()
   let feedItems = options.items || [sourceItem()]
@@ -16,6 +16,7 @@ function setup (options = {}) {
     resolveIdentity: async context => { calls.identity = context; return options.openid || 'server-user' },
     readPreferences: async openid => { calls.preferences.push(openid); return preferences },
     readItems: async range => { calls.feeds.push(range); return feedItems },
+    readJobs: async (openid, range) => { calls.jobs.push({ openid, range }); return options.jobs || [] },
     snapshotStore: {
       saveIfAbsent: async args => {
         calls.saves.push(args)
@@ -42,6 +43,34 @@ async function run () {
   assert.equal(base.calls.saves[0].digestGeneration, 7)
   assert.deepEqual(base.calls.feeds[0], { start: '2026-10-28T00:00:00.000Z', end: '2026-10-29T00:00:00.000Z' })
   assert.equal('openid' in base.calls.feeds[0], false)
+  assert.equal(base.calls.jobs.length, 0, 'jobs reader must not run without explicit job subscription')
+
+  const jobPreference = setup({
+    preferences: { dailyDigestEnabled: true, timezone: 'Asia/Shanghai', digestLocalTime: '08:00', generation: 2, digestGeneration: 7, topics: { jobs: 0.4, ai: 0.35 } },
+    jobs: [{ companyId: 'company-a', title: 'Secret title must not be persisted as content', note: 'private note' }]
+  })
+  jobPreference.service = createDigestService({
+    resolveIdentity: async () => 'server-user',
+    readPreferences: async () => ({ dailyDigestEnabled: true, timezone: 'Asia/Shanghai', digestLocalTime: '08:00', generation: 2, digestGeneration: 7, topics: { jobs: 0.4, ai: 0.35 } }),
+    readItems: async () => [sourceItem()],
+    readJobs: async (openid, range) => { jobPreference.calls.jobs.push({ openid, range }); return [{ companyId: 'company-a', title: 'private role text' }] },
+    snapshotStore: { saveIfAbsent: async args => { jobPreference.calls.saves.push(args); return { created: true, record: args.snapshot } }, getMine: async () => null },
+    now: () => Date.parse('2026-10-29T01:30:00Z')
+  })
+  const withJob = await jobPreference.service.generate({}, {})
+  assert.deepEqual(withJob.snapshot.jobCompanyIds, ['company-a'])
+  assert.equal('title' in withJob.snapshot, false)
+  assert.equal('note' in withJob.snapshot, false)
+  assert.deepEqual(Object.keys(jobPreference.calls.jobs[0]).sort(), ['openid', 'range'])
+  assert.equal(jobPreference.calls.jobs[0].openid, 'server-user')
+
+  const jobFailure = createDigestService({
+    resolveIdentity: async () => 'server-user',
+    readPreferences: async () => ({ dailyDigestEnabled: true, timezone: 'Asia/Shanghai', digestLocalTime: '08:00', generation: 0, digestGeneration: 0, topics: { jobs: 0.4 } }),
+    readItems: async () => [], readJobs: async () => { throw Object.assign(new Error('private details'), { code: 'jobs_unavailable' }) },
+    snapshotStore: { saveIfAbsent: async () => ({}), getMine: async () => null }, now: () => Date.parse('2026-10-29T01:30:00Z')
+  })
+  await assert.rejects(jobFailure.generate({}, {}), e => e.code === 'jobs_unavailable')
 
   // Existing daily snapshots remain stable when the feed changes after generation.
   base.setItems([sourceItem('release-b')])

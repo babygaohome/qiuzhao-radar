@@ -105,7 +105,7 @@ function publicItem (item, expectedId) {
   return out
 }
 
-function createDigestHandlers ({ db, now = () => Date.now() } = {}) {
+function createDigestHandlers ({ db, now = () => Date.now(), loadJobItems } = {}) {
   if (!db || typeof db.collection !== 'function') throw new TypeError('database_required')
 
   async function readState (openid) {
@@ -141,11 +141,19 @@ function createDigestHandlers ({ db, now = () => Date.now() } = {}) {
     if (!Array.isArray(record.itemIds) || record.itemIds.length > 12 || new Set(record.itemIds).size !== record.itemIds.length || record.itemIds.some(itemId => typeof itemId !== 'string' || !ITEM_ID.test(itemId))) {
       throw fail('server_error', 'digest snapshot invalid')
     }
+    if (!Array.isArray(record.jobCompanyIds) || record.jobCompanyIds.length > 4 ||
+      new Set(record.jobCompanyIds).size !== record.jobCompanyIds.length ||
+      record.jobCompanyIds.some(companyId => typeof companyId !== 'string' || !ITEM_ID.test(companyId))) {
+      throw fail('server_error', 'digest job snapshot invalid')
+    }
     const items = await loadPublicItems(db, record.itemIds)
+    const jobItems = record.jobCompanyIds.length
+      ? await readSnapshotJobs(loadJobItems, openid, record.jobCompanyIds)
+      : []
     return { digest: {
       localDate,
       items,
-      jobItems: [],
+      jobItems,
       generatedAt: record.generatedAt
     } }
   }
@@ -185,7 +193,7 @@ function historySummary (row, openid, state) {
     row.generation !== state.generation || row.digestGeneration !== state.digestGeneration ||
     typeof row.localDate !== 'string' || !isValidLocalDate(row.localDate) ||
     !Array.isArray(row.itemIds) || row.itemIds.length > 12 || row.itemIds.some(id => typeof id !== 'string' || !ITEM_ID.test(id)) ||
-    !Array.isArray(row.jobCompanyIds) || row.jobCompanyIds.length > 12 || row.jobCompanyIds.some(id => typeof id !== 'string') ||
+    !Array.isArray(row.jobCompanyIds) || row.jobCompanyIds.length > 4 || row.jobCompanyIds.some(id => typeof id !== 'string' || !ITEM_ID.test(id)) ||
     row.itemIds.length + row.jobCompanyIds.length > 12 ||
     typeof row.generatedAt !== 'string' || !Number.isFinite(Date.parse(row.generatedAt)) ||
     row._id !== digestId(openid, row.localDate, state.generation, state.digestGeneration, state.timeZone)) {
@@ -198,15 +206,40 @@ function historySummary (row, openid, state) {
   }
 }
 
+async function readSnapshotJobs (loadJobItems, openid, companyIds) {
+  if (typeof loadJobItems !== 'function') throw fail('server_error', 'digest jobs unavailable')
+  if (!Array.isArray(companyIds) || companyIds.length > 4 || companyIds.some(id => typeof id !== 'string' || !ITEM_ID.test(id)) || new Set(companyIds).size !== companyIds.length) {
+    throw fail('server_error', 'digest jobs snapshot invalid')
+  }
+  const rows = await loadJobItems(openid, companyIds.slice())
+  if (!Array.isArray(rows) || rows.length > companyIds.length) throw fail('server_error', 'digest jobs unavailable')
+  const byId = new Map()
+  for (const row of rows) {
+    if (!isRecord(row) || !companyIds.includes(row.companyId) || byId.has(row.companyId) ||
+      typeof row.title !== 'string' || !row.title.trim() || typeof row.company !== 'string' || !row.company.trim() ||
+      typeof row.deadline !== 'string' || !row.deadline || typeof row.originalUrl !== 'string' ||
+      !safeUrl(row.originalUrl) || row.reason !== '你标记的已核实岗位') throw fail('server_error', 'digest jobs record invalid')
+    byId.set(row.companyId, {
+      companyId: row.companyId,
+      title: row.title.trim().slice(0, 180),
+      company: row.company.trim().slice(0, 180),
+      deadline: row.deadline,
+      originalUrl: safeUrl(row.originalUrl),
+      reason: row.reason
+    })
+  }
+  return companyIds.map(id => byId.get(id)).filter(Boolean)
+}
+
 // Construct an inert router when the server-side rollout flag is off. This
 // keeps preview clients from touching newly provisioned collections before
 // operators deliberately enable the feature.
-function createDigestFeatureHandlers ({ db, enabled, now } = {}) {
+function createDigestFeatureHandlers ({ db, enabled, now, loadJobItems } = {}) {
   if (enabled !== true) {
     const disabled = async () => ({ error: 'feature_disabled', message: '每日简报暂未开放' })
     return { intelDigestToday: disabled, intelDigestByDate: disabled, intelDigestHistory: disabled }
   }
-  const handlers = createDigestHandlers({ db, now })
+  const handlers = createDigestHandlers({ db, now, loadJobItems })
   return {
     intelDigestToday: (event, serverOpenid) => handlers.intelDigestToday(event, serverOpenid),
     intelDigestByDate: (event, serverOpenid) => handlers.intelDigestByDate(event, serverOpenid),

@@ -63,6 +63,8 @@ function createMain ({
     const { createLeaseStore, createPreferencePager } = require('./cloudbase-adapters')
     const { createSnapshotStore } = require('./snapshot-store')
     const { createDigestService } = require('./service')
+    const { createDigestJobsReader } = require('./digest-jobs')
+    const { createDigestVisibility } = require('./job-visibility')
     const { createDigestScheduler } = require('./scheduler')
 
     const readPreferences = async openid => {
@@ -71,10 +73,18 @@ function createMain ({
     }
     const readItems = async ({ start, end }) => readPublicWindow(db, { start, end })
     const snapshots = createSnapshotStore({ db })
+    const visibility = createDigestVisibility({ command: db.command })
+    const digestJobs = createDigestJobsReader({
+      db,
+      command: db.command,
+      buildWhere: (event, openid, hidden) => visibility.build({ openid, hidden }),
+      readHidden: createReadHidden(db)
+    })
     const service = createDigestService({
       resolveIdentity: context => context && context[INTERNAL_USER] === true && typeof context.openid === 'string' ? context.openid : '',
       readPreferences,
       readItems,
+      readJobs: (openid, window) => digestJobs.read(openid, window),
       snapshotStore: snapshots
     })
     const scheduler = (makeScheduler || createDigestScheduler)({
@@ -136,6 +146,19 @@ async function readPublicWindow (db, { start, end }) {
   return items
 }
 
+
+function createReadHidden (db) {
+  return async function readHidden (openid) {
+    const result = await db.collection('profiles').where({ _id: openid }).field({ hidden: true }).limit(1).get()
+    if (!result || !Array.isArray(result.data)) throw safeError('visibility_unavailable')
+    if (result.data.length === 0) return []
+    const record = result.data[0]
+    if (!record || !Object.prototype.hasOwnProperty.call(record, 'hidden')) return []
+    if (!Array.isArray(record.hidden) || record.hidden.some(id => typeof id !== 'string')) throw safeError('visibility_unavailable')
+    return record.hidden
+  }
+}
+
 function requireRows (result) {
   if (!result || !Array.isArray(result.data)) throw safeError('feed_unavailable')
   return result.data
@@ -144,7 +167,7 @@ function requireRows (result) {
 function safeError (code) { return Object.assign(new Error(code), { code }) }
 
 exports.main = createMain()
-exports._test = { TRIGGER_NAME, READ_BATCH, MAX_WINDOW_ITEMS, INTERNAL_USER, validTimerEnvelope, isTrustedRuntimeContext, safeTimerResult, createMain, readPublicWindow, requireRows }
+exports._test = { TRIGGER_NAME, READ_BATCH, MAX_WINDOW_ITEMS, INTERNAL_USER, validTimerEnvelope, isTrustedRuntimeContext, safeTimerResult, createMain, readPublicWindow, requireRows, createReadHidden }
 exports.createMain = createMain
 exports.validTimerEnvelope = validTimerEnvelope
 exports.safeTimerResult = safeTimerResult
@@ -152,3 +175,4 @@ exports.TRIGGER_NAME = TRIGGER_NAME
 exports.readPublicWindow = readPublicWindow
 exports.MAX_WINDOW_ITEMS = MAX_WINDOW_ITEMS
 exports.requireRows = requireRows
+exports.createReadHidden = createReadHidden

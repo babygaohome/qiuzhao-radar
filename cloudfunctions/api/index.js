@@ -27,6 +27,7 @@ const catalogQuality = require('./catalog-quality')
 const intel = require('./intel/handlers')
 const intelPreferences = require('./intel/preferences')
 const { createDigestFeatureHandlers } = require('./intel/digest-handlers')
+const { createDigestJobsReader } = require('./intel/digest-jobs')
 const { readOptionalDocument, markIntelDeleted } = intelPreferences
 // User paused the full-catalog review on 2026-10-22. Keep existing results.
 const CATALOG_AUDIT_PAUSED = true
@@ -216,7 +217,25 @@ Object.assign(handlers, intelPreferences.createPreferenceHandlers({
 }))
 Object.assign(handlers, createDigestFeatureHandlers({
   db,
-  enabled: process.env.INTEL_DIGEST_ENABLED === 'true'
+  enabled: process.env.INTEL_DIGEST_ENABLED === 'true',
+  loadJobItems: async (openid, companyIds) => {
+    if (!Array.isArray(companyIds) || companyIds.length === 0) return []
+    // Read only the hidden-company IDs needed by the existing visibility predicate.
+    const hiddenResult = await db.collection('profiles').where({ _id: openid }).field({ hidden: true }).limit(1).get()
+    if (!hiddenResult || !Array.isArray(hiddenResult.data)) throw new AppError('server_error', '无法核验岗位可见性')
+    const hidden = hiddenResult.data[0] && hiddenResult.data[0].hidden
+    if (hidden !== undefined && (!Array.isArray(hidden) || hidden.some(id => typeof id !== 'string'))) throw new AppError('server_error', '岗位可见性数据无效')
+    const reader = createDigestJobsReader({
+      db,
+      command: _,
+      buildWhere,
+      readHidden: async () => hidden || []
+    })
+    const candidates = await reader.read(openid)
+    const wanted = new Set(companyIds)
+    const byCompany = new Map(candidates.filter(item => wanted.has(item.companyId)).map(item => [item.companyId, item]))
+    return companyIds.map(id => byCompany.get(id)).filter(Boolean)
+  }
 }))
 handlers.publicJobsStatus = async () => {
   const record=await readDoc('meta','publicJobsLast')
