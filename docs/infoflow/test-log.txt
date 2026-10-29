@@ -1,0 +1,57 @@
+InfoFlow verification log
+Date: 2026-10-29 Australia/Brisbane
+Node: v26.0.0; npm: 11.12.1
+API node_modules: absent; no dependency installation or lockfile changes
+
+Pre-change baseline: 14 security/*.test.cjs, 11 pass / 3 fail.
+Failures reproduced before edits and unchanged after edits:
+  isolation.test.cjs exit 1 at line 96: dispute fixture not verified at start.
+  loading-api.test.cjs exit 1 at line 47: expected 1, actual 0.
+  manual-review.test.cjs exit 1 at line 153: false !== true.
+
+Post-change all security/*.test.cjs:
+security/catalog-audit.test.cjs exit=0
+security/catalog-corrections.test.cjs exit=0
+security/catalog-quality.test.cjs exit=0
+security/client-catalog-policy.test.cjs exit=0
+security/crawler-refresh.test.cjs exit=0
+security/detail-review.test.cjs exit=0
+security/discovery.test.cjs exit=0
+security/home-loading.test.cjs exit=0
+security/infoflow.test.cjs exit=1 | AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:  0 !== 1      at pageBehavior (/Users/gaoziteng/Documents/Codex/2026-10-29/da-ka/work/qiuzhao-upload/security/infoflow.test.cjs:98:10) {   generatedMe
+
+security/isolation.test.cjs exit=1 | AssertionError [ERR_ASSERTION]: dispute fixture not verified at start     at check (/Users/gaoziteng/Documents/Codex/2026-10-29/da-ka/work/qiuzhao-upload/security/isolation.test.cjs:96:42)     at run (/Users/gaoziteng/Do
+
+security/loading-api.test.cjs exit=1 | AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:  0 !== 1      at main (/Users/gaoziteng/Documents/Codex/2026-10-29/da-ka/work/qiuzhao-upload/security/loading-api.test.cjs:47:10) {   generatedMessage
+
+security/manual-review.test.cjs exit=1 | AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:  false !== true      at main (/Users/gaoziteng/Documents/Codex/2026-10-29/da-ka/work/qiuzhao-upload/security/manual-review.test.cjs:153:10) {   genera
+
+security/public-jobs.test.cjs exit=0
+security/web-access.test.cjs exit=0
+security/web-entrypoint.test.cjs exit=0
+
+Focused InfoFlow test:
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+0 !== 1
+
+    at pageBehavior (/Users/gaoziteng/Documents/Codex/2026-10-29/da-ka/work/qiuzhao-upload/security/infoflow.test.cjs:98:10) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: 0,
+  expected: 1,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+exit=1
+
+JavaScript syntax:
+exit=0
+
+JSON parse:
+17 JSON files parsed
+exit=0
+
+diff-check exit=0
+
+Verification caveat: after this recorded full-suite run, the local demo filter fixture stub and unknown publication/summary-status display/projection were adjusted. The focused InfoFlow test has not been rerun after those latest edits; do not treat the earlier focused PASS as final evidence. Parent review is required for the final rerun.

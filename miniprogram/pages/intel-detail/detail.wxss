@@ -1,0 +1,9 @@
+.wrap { padding: 28rpx; }
+.notice { margin-bottom: 18rpx; padding: 14rpx 18rpx; border-radius: 14rpx; background: var(--accent-soft); color: var(--accent); font-size: 23rpx; font-weight: 650; }
+.card { padding: 26rpx; border-radius: 20rpx; background: var(--surface); border: 1rpx solid var(--line); box-shadow: var(--shadow); }
+.meta { display: flex; flex-wrap: wrap; gap: 14rpx; color: var(--muted); font-size: 22rpx; }
+.title { margin-top: 20rpx; font-size: 35rpx; font-weight: 750; line-height: 1.45; }
+.summary { margin-top: 20rpx; font-size: 27rpx; line-height: 1.7; color: var(--ink); }
+.link { display: inline-block; margin-top: 28rpx; padding: 12rpx 22rpx; background: var(--accent-soft); color: var(--accent); border-radius: 999rpx; font-size: 24rpx; }
+.unknown { margin-top: 24rpx; color: var(--muted); font-size: 23rpx; }
+.state { padding: 28rpx; border-radius: 18rpx; background: var(--surface); color: var(--muted); text-align: center; }

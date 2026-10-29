@@ -3,6 +3,8 @@
     "pages/index/index",
     "pages/mine/mine",
     "pages/ai/ai",
+    "pages/intel/index",
+    "pages/intel-detail/detail",
     "pages/detail/detail",
     "pages/edit/edit",
     "pages/materials/materials",
@@ -26,7 +28,8 @@
     "list": [
       { "pagePath": "pages/index/index", "iconPath": "@icHome", "selectedIconPath": "@icHomeOn", "text": "在招公司" },
       { "pagePath": "pages/mine/mine", "iconPath": "@icMine", "selectedIconPath": "@icMineOn", "text": "我的投递" },
-      { "pagePath": "pages/ai/ai", "iconPath": "@icAi", "selectedIconPath": "@icAiOn", "text": "AI 挑选" }
+      { "pagePath": "pages/ai/ai", "iconPath": "@icAi", "selectedIconPath": "@icAiOn", "text": "AI 挑选" },
+      { "pagePath": "pages/intel/index", "iconPath": "@icIntel", "selectedIconPath": "@icIntelOn", "text": "情报" }
     ]
   },
   "darkmode": true,
