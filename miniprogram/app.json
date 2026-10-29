@@ -5,6 +5,7 @@
     "pages/ai/ai",
     "pages/intel/index",
     "pages/intel-detail/detail",
+    "pages/intel-preferences/index",
     "pages/detail/detail",
     "pages/edit/edit",
     "pages/materials/materials",

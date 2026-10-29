@@ -48,7 +48,7 @@ async function signedPagination () {
   assert.equal((await handlers.intelFeed({ category: 'semiconductor', limit: 1, cursor: first.nextCursor }, 'owner-a')).error, 'bad_request')
   assert.equal((await handlers.intelFeed({ category: 'ai', limit: 2, cursor: first.nextCursor }, 'owner-a')).error, 'bad_request')
   rows.push({ id: 'inserted', category: 'ai', title: 'Changed snapshot', publishedAt: '2026-04-01T00:00:00Z', status: 'published' })
-  assert.equal((await handlers.intelFeed({ category: 'ai', limit: 1, cursor: first.nextCursor }, 'owner-a')).error, 'bad_request')
+  assert.equal((await handlers.intelFeed({ category: 'ai', limit: 1, cursor: first.nextCursor }, 'owner-a')).error, 'conflict')
   const expiring = await handlers.intelFeed({ category: 'ai', limit: 1 }, 'owner-a')
   time += 15 * 60 * 1000 + 1
   assert.equal((await handlers.intelFeed({ category: 'ai', limit: 1, cursor: expiring.nextCursor }, 'owner-a')).error, 'bad_request')

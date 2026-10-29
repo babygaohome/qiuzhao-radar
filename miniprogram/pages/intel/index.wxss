@@ -5,6 +5,7 @@
 .intel-heading { position: relative; z-index: 1; margin-top: 10rpx; font-size: 42rpx; line-height: 1.25; font-weight: 760; }
 .intel-subtitle { position: relative; z-index: 1; margin-top: 8rpx; color: var(--muted); font-size: 23rpx; line-height: 1.5; }
 .intel-updated { position: relative; z-index: 1; margin-top: 18rpx; color: var(--muted); font-size: 20rpx; }
+.intel-settings-link { position: relative; z-index: 1; display: inline-block; margin-top: 18rpx; color: var(--accent); font-size: 22rpx; font-weight: 650; }
 .intel-notice { margin-top: 18rpx; padding: 18rpx 20rpx; border: 1rpx solid var(--line); border-radius: 16rpx; background: var(--surface); color: var(--muted); font-size: 23rpx; }
 .intel-notice-demo { color: var(--accent); background: var(--accent-soft); border-color: transparent; font-weight: 650; }
 .intel-filters { white-space: nowrap; margin: 24rpx -4rpx 18rpx; }
@@ -20,6 +21,11 @@
 .intel-card-footer { display: flex; justify-content: space-between; gap: 12rpx; flex-wrap: wrap; margin-top: 15rpx; color: var(--muted); font-size: 20rpx; }
 .intel-summary-status { color: var(--muted); }
 .intel-card-open { margin-top: 17rpx; padding-top: 14rpx; border-top: 1rpx solid var(--line); color: var(--accent); font-size: 22rpx; font-weight: 600; }
+.intel-feedback { display: flex; flex-wrap: wrap; gap: 10rpx; align-items: center; margin-top: 14rpx; }
+.intel-feedback-button { margin: 0; padding: 8rpx 14rpx; border: 1rpx solid var(--line); border-radius: 999rpx; background: var(--surface); color: var(--muted); font-size: 20rpx; line-height: 1.4; }
+.intel-feedback-button::after { border: 0; }
+.intel-feedback-button.is-on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.intel-feedback-error { width: 100%; color: var(--bad); font-size: 20rpx; }
 .intel-arrow { float: right; font-size: 30rpx; line-height: 20rpx; }
 .intel-state { margin-top: 24rpx; padding: 38rpx 28rpx; border: 1rpx solid var(--line); border-radius: 20rpx; background: var(--surface); text-align: center; }
 .intel-state-mark { color: var(--accent); font-size: 38rpx; }
@@ -30,6 +36,8 @@
 .intel-inline-error { padding: 15rpx 18rpx; border-radius: 12rpx; background: var(--accent-soft); color: var(--muted); font-size: 21rpx; line-height: 1.5; }
 .intel-inline-link { margin-left: 10rpx; color: var(--accent); font-weight: 650; }
 .intel-more-button { min-height: 78rpx; margin-top: 2rpx; border: 1rpx solid var(--line); border-radius: 14rpx; background: var(--surface); color: var(--accent); font-size: 23rpx; }
+.intel-refresh-button { display: inline-block; min-height: 58rpx; margin-left: 12rpx; padding: 0 18rpx; border: 1rpx solid var(--line); border-radius: 999rpx; background: var(--surface); color: var(--accent); font-size: 20rpx; line-height: 58rpx; }
+.intel-refresh-button::after { border: 0; }
 .intel-more-state, .intel-end { padding: 22rpx; color: var(--muted); text-align: center; font-size: 21rpx; }
 
 @media (prefers-color-scheme: dark) {

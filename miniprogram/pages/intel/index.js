@@ -24,7 +24,8 @@ function presentItem (item) {
     displaySummary: item && item.summaryZh || '该条目未提供中文摘要，请查看原始发布说明。',
     displaySummaryStatus: statusLabels[status] || '摘要状态未知',
     displayType,
-    displayTitle: item && item.title || (item && item.version ? `${displayType} ${item.version}` : '标题未知')
+    displayTitle: item && item.title || (item && item.version ? `${displayType} ${item.version}` : '标题未知'),
+    feedback: Object.assign({ liked: false, bookmarked: false, disliked: false }, item && item.feedback || {})
   })
 }
 
@@ -35,7 +36,7 @@ function filteredDemo (category) {
 Page({
   data: {
     items: [], loading: false, loadingMore: false, error: '', moreError: '',
-    enabled: false, demo: false, nextCursor: null, digestAtLabel: '', windowNotice: '',
+    enabled: false, demo: false, nextCursor: null, digestAtLabel: '', windowNotice: '', feedbackBusyId: '', cursorConflict: false, refreshing: false,
     filters: [
       { key: 'all', label: '全部' }, { key: 'ai', label: 'AI' },
       { key: 'semiconductor', label: '半导体' }, { key: 'electronics', label: '电子' }
@@ -80,7 +81,7 @@ Page({
     const category = this.data.category
     const keepItems = options.keepItems === true
     this.setData({
-      loading: true, loadingMore: false, error: '', moreError: '', nextCursor: null,
+      loading: true, loadingMore: false, error: '', moreError: '', cursorConflict: false, refreshing: keepItems, nextCursor: null,
       items: keepItems ? this.data.items : [], digestAtLabel: '', windowNotice: ''
     })
     try {
@@ -91,16 +92,16 @@ Page({
         items, nextCursor: result && result.nextCursor || null,
         windowNotice: result && result.windowLimited ? '当前仅展示按记录编号排序的最多 300 条已发布条目。' : '',
         digestAtLabel: result && result.digestAt ? `更新于 ${dateLabel(result.digestAt)}` : '',
-        loading: false, error: '', moreError: ''
+        loading: false, refreshing: false, error: '', moreError: ''
       })
     } catch (error) {
       if (!this.alive || seq !== this.seq) return
       const message = error && error.message
       if (error && error.code === 'feature_disabled') {
-        this.setData({ enabled: false, loading: false, error: '', items: [], nextCursor: null })
+        this.setData({ enabled: false, loading: false, refreshing: false, error: '', items: [], nextCursor: null })
         return
       }
-      this.setData({ loading: false, error: message === '情报功能暂未开启' ? message : (message || '暂时无法加载情报') })
+      this.setData({ loading: false, refreshing: false, error: message === '情报功能暂未开启' ? message : (message || '暂时无法加载情报') })
     }
   },
 
@@ -123,7 +124,11 @@ Page({
       this.setData({ items: existing.concat(appended), nextCursor: result && result.nextCursor || null, loadingMore: false, moreError: '' })
     } catch (error) {
       if (!this.alive || seq !== this.seq) return
-      this.setData({ loadingMore: false, moreError: (error && error.message) || '暂时无法加载更多' })
+      if (error && error.code === 'conflict') {
+        this.setData({ loadingMore: false, cursorConflict: true, moreError: '资讯排序或反馈状态已更新，请刷新列表后继续。' })
+        return
+      }
+      this.setData({ loadingMore: false, cursorConflict: false, moreError: (error && error.message) || '暂时无法加载更多' })
     }
   },
 
@@ -145,9 +150,37 @@ Page({
     wx.navigateTo({ url: `/pages/intel-detail/detail?id=${encodeURIComponent(id)}${this.data.demo ? '&demo=1' : ''}` })
   },
 
+  onOpenPreferences () { wx.navigateTo({ url: '/pages/intel-preferences/index' }) },
+
+  async onFeedback (event) {
+    const id = event.currentTarget.dataset.id
+    const action = event.currentTarget.dataset.action
+    if (!this.data.enabled || this.data.demo || this.data.feedbackBusyId || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(id || '') || !['like', 'unlike', 'bookmark', 'unbookmark', 'dislike', 'undislike'].includes(action)) return
+    const previous = this.data.items.find(item => item.id === id)
+    if (!previous) return
+    this.setData({ feedbackBusyId: id, items: this.data.items.map(item => item.id === id ? Object.assign({}, item, { feedbackError: '' }) : item) })
+    try {
+      const result = await api('intelFeedback', { itemId: id, feedbackAction: action })
+      if (!this.alive) return
+      const state = result && result.state || {}
+      this.setData({ items: this.data.items.map(item => item.id === id ? Object.assign({}, item, { feedback: Object.assign({}, item.feedback, { liked: !!state.liked, bookmarked: !!state.bookmarked, disliked: !!state.disliked }), feedbackError: '' }) : item) })
+    } catch (error) {
+      if (!this.alive) return
+      this.setData({ items: this.data.items.map(item => item.id === id ? Object.assign({}, item, { feedbackError: (error && error.message) || '操作失败，请重试' }) : item) })
+    } finally {
+      if (this.alive) this.setData({ feedbackBusyId: '' })
+    }
+  },
+
+  noop () {},
+
   onRetry () {
     if (this.data.enabled && !this.data.demo) this.loadFeed({ keepItems: this.data.items.length > 0 })
   },
 
-  onRetryMore () { this.loadMore() }
+  onRetryMore () { this.loadMore() },
+
+  onRefreshFeed () {
+    if (this.data.enabled && !this.data.demo) this.loadFeed({ keepItems: true })
+  }
 })

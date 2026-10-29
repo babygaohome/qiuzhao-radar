@@ -30,5 +30,14 @@
       <view class="intel-detail-section-title">证据链接</view>
       <view wx:for="{{item.evidenceLinks}}" wx:key="*this" class="intel-detail-evidence-row">{{index + 1}}. {{item}}</view>
     </view>
+    <view wx:if="{{enabled && !demo}}" class="intel-detail-feedback">
+      <view class="intel-detail-section-title">告诉我们这条内容是否有用</view>
+      <view class="intel-detail-feedback-row">
+        <button class="intel-detail-link {{item.feedback.liked ? 'is-on' : ''}}" loading="{{feedbackBusy}}" disabled="{{feedbackBusy}}" data-action="{{item.feedback.liked ? 'unlike' : 'like'}}" bindtap="onFeedback">{{item.feedback.liked ? '撤销喜欢' : '喜欢'}}</button>
+        <button class="intel-detail-link {{item.feedback.bookmarked ? 'is-on' : ''}}" loading="{{feedbackBusy}}" disabled="{{feedbackBusy}}" data-action="{{item.feedback.bookmarked ? 'unbookmark' : 'bookmark'}}" bindtap="onFeedback">{{item.feedback.bookmarked ? '取消收藏' : '收藏'}}</button>
+        <button class="intel-detail-link {{item.feedback.disliked ? 'is-on' : ''}}" loading="{{feedbackBusy}}" disabled="{{feedbackBusy}}" data-action="{{item.feedback.disliked ? 'undislike' : 'dislike'}}" bindtap="onFeedback">{{item.feedback.disliked ? '撤销不感兴趣' : '不感兴趣'}}</button>
+      </view>
+      <view wx:if="{{feedbackError}}" class="intel-detail-feedback-error">{{feedbackError}}</view>
+    </view>
   </view>
 </view>
